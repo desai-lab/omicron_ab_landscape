@@ -1,7 +1,7 @@
 ---
 title: "Omicron_ACE2_Landscape"
 author: "Alief Moulana"
-date: "4/27/2022"
+date: "8/27/2022"
 output: rmarkdown::github_document
 ---
 
@@ -21,7 +21,9 @@ library(paletteer)
 library(cowplot)
 library(Rmisc)
 library(scales)
+library(tidyverse)
 library(ggtext)
+library(purrr)
 ```
 
 ## Load the Data
@@ -61,7 +63,7 @@ REGN10987 <- read.table(file = 'data/cleaned_Kds_RBD_REGN10987_proper.csv', sep 
                   header = TRUE,
                   colClasses=c("numeric","character",rep("numeric",63),"logical","logical")
                   ) %>% select(geno,log10Kd_pinned,err_log10Kd,is_non_binder,is_clean)
-Kds.REGN10987<- REGN10987  
+Kds.REGN10987 <- REGN10987  
 
 Kds_ACE2 <- read.table(file = 'data/cleaned_Kds_RBD_ACE2_low_filter.tsv', sep = '\t', 
                   header = TRUE, 
@@ -86,7 +88,7 @@ Kds_simplified$Log10Kd <- ifelse((Kds_simplified$NonBinder),
                                  ifelse(Kds_simplified$Filtered,
                                         Kds_simplified$Log10Kd_unfiltered,
                                         NA))
-
+#here what we do is to pin NonBinder to 5.0 (this value is just to make it easier to plot) and if the data is not clean, we also exclude them
 
 Kds.short.tradeoff <- data.frame(Genotype = Kds_simplified[1:nrow(Kds.ACE2),]$Genotype,
                                  ACE2 = subset(Kds_simplified,Antibody=="ACE2")$Log10Kd,
@@ -95,39 +97,9 @@ Kds.short.tradeoff <- data.frame(Genotype = Kds_simplified[1:nrow(Kds.ACE2),]$Ge
                                  REGN10987 = subset(Kds_simplified,Antibody=="REGN10987")$Log10Kd,
                                  S309 = subset(Kds_simplified,Antibody=="S309")$Log10Kd)
 
-
-###Epistasis Data###
-CoV555 <- read.delim("data/555_aic_6order_biochem.txt" ,skip = 1,header = TRUE, sep = "\t", dec = ".")
-S309<- read.delim("data/S309_aic_4order_biochem.txt" ,skip = 1,header = TRUE, sep = "\t", dec = ".") 
-CB6 <- read.delim("data/CB6_aic_3order_biochem.txt" ,skip = 1,header = TRUE, sep = "\t", dec = ".") 
-REGN10987 <- read.delim("data/REGN_aic_5order_biochem.txt" ,skip = 1,header = TRUE, sep = "\t", dec = ".") 
-epistasis.biochem <- AppendMe(c("CoV555","S309","CB6","REGN10987"))
-#epistasis.stat <- read.delim("data/ACE2_4order_stat.txt",skip = 2,header = TRUE, sep = "\t", dec = ".")
-epistasis.biochem$Order <- ifelse(epistasis.biochem$Term == "Intercept",0,str_count(epistasis.biochem$Term, pattern = ",")+1)
-#epistasis.stat$Order <- ifelse(epistasis.stat$Term == "Intercept",0,str_count(epistasis.stat$Term, pattern = ",")+1)
-epistasis.biochem <- separate(data = epistasis.biochem, col = Term, into = c("Term 1", "Term 2", "Term 3", "Term 4","Term 5","Term 6"), sep = ",")
-epistasis.biochem[,1:6] <- apply(epistasis.biochem[,1:6],2,mapvalues,from=n,to=nn.muts)
-epistasis.biochem[,1:6]<- lapply(epistasis.biochem[,1:6], function(X){ordered(X,levels = nn.muts,labels=nn.muts)})
-
-#epistasis.stat <- separate(data = epistasis.stat, col = Term, into = c("Term 1", "Term 2", "Term 3", "Term 4"), sep = ",")
-#epistasis.stat[,1:4] <- apply(epistasis.stat[,1:4],2,mapvalues,from=n,to=nn.muts)
-#epistasis.stat[,1:4]<- lapply(epistasis.stat[,1:4], function(X){ordered(X,levels = nn.muts,labels=nn.muts)})
-
-###Structure Data for Epistasis###
-#first.structure <- read.delim("data/firstorder_structure_summaryACE2.csv" ,header = TRUE, sep = ",", dec = ".")
-#second.structure <- read.delim("data/2ndorder_structure_summaryACE2.csv" ,header = TRUE, sep = ",", dec = ".")
-
-###Data for Delta Delta Delta G###
-#delta.G.vs.immune <- read.delim("data/deltadeltadeltag.csv" ,header = TRUE, sep = ",", dec = ".")
-
-###Probability Data###
-#probability <- read.delim("data/proba_order_mut_above_wuhan_withx.csv" ,header = TRUE, sep = ",", dec = ".")
-#strong.probability <- read.delim("data/proba_order_strong_selection.csv" ,header = TRUE, sep = ",", dec = ".")
-#three.way <- read.delim("data/probability_three_mutations.csv" ,header = TRUE, sep = ",", dec = ".")
-#gisaid.mean <-read.delim("data/gisaid_fig1_data_withx.csv" ,header = TRUE, sep = ",", dec = ".")
-#gisaid.N501Y <-read.delim("data/gisaid_fig2_data_withx.csv" ,header = TRUE, sep = ",", dec = ".")
 ```
 
+## General Data Clean-up
 ```{r prepping_figure1c}
 Kds_simplified$Antibody <- factor(Kds_simplified$Antibody, levels = c("CB6","CoV555","REGN10987","S309","ACE2"))
 Kds_simplified[paste0('Mutation ', nn)] <- purrr::map_dfc(n, 
@@ -215,7 +187,7 @@ Kds_mutation_effects.long.filtered <- subset(Kds_mutational_effects.long.all.abs
 ```
 
 ## Figure 1 - General Landscape
-Figure 1: General Landscape.
+Figure 1A: General Landscape.
 ```{r histogram}
 antibody.colors <- c(getPalettePairedLong(15)[4],getPalettePairedLong(15)[6],
                      getPalettePairedLong(15)[8],getPalettePairedLong(15)[10])
@@ -285,7 +257,7 @@ ggplot(Kds_simplified.withoutACE2, aes(x=Log10Kd.nb))+
 ggsave("figures/Figure1_histogram_distribution_of_Kds_all_abs.png", width = 7.5, height = 2, units = "in")
 ```
 
-the summary table
+Figure 1B: Summary of Effects and Contact
 ```{r summary table}
 Kds_effect_summarized <- Kds_mutation_effects.long.filtered %>%
   select(`KD Effect`, Mutation, Antibody)%>%
@@ -330,7 +302,7 @@ ggplot(Kds_effect_summarized) +
         legend.key.height = unit(0.4, "in"),
         legend.justification = "top")
 
-ggsave("figures/Figure1_summary_table_mean_effects_edit.png", width = 6, height = 3.5, units = "in")
+ggsave("figures/FigureS1_summary_table_mean_effects_edit.png", width = 6, height = 3.5, units = "in")
 
 
 #Sd heatmap
@@ -352,9 +324,138 @@ ggplot(Kds_effect_summarized) +
         legend.spacing.x = unit(0.2, 'cm'))
 ggsave("figures/FigureS1_summary_table_std_effects.png", width = 6, height = 2.5, units = "in")
 
+#Heatmap with residues
+#load structure data
+first_order_structure <- read.delim("data/first_order_structure_summary.csv" ,header = TRUE, sep = ",", dec = ".")
+first_order_structure$Term <- factor(rep(nn.muts,4),levels=nn.muts)
+first_order_structure$Antibody <- factor(first_order_structure$Antibody,levels=antibodies)
+first_order_structure$Buried_SA.nb <- ifelse(first_order_structure$Buried_SA<0, 
+                                          log10(0), 
+                                          log10(first_order_structure$Buried_SA))
+first_order_structure$Buried_SA.nb2 <- ifelse(first_order_structure$Buried_SA<0, 
+                                              0, 
+                                              first_order_structure$Buried_SA)
+
+first_order_structure$Antibody.used <- ifelse(first_order_structure$Antibody=="CB6","LY-CoV016",
+                                             ifelse(first_order_structure$Antibody=="CoV555",
+                                                    "LY-CoV555",
+                                                    as.character(first_order_structure$Antibody)))
+
+first_order_structure$Antibody.used <- factor(first_order_structure$Antibody.used,
+                                              levels = c("S309",
+                                                         "REGN10987",
+                                                         "LY-CoV555",
+                                                         "LY-CoV016")
+)
+first_order_structure <- rbind(subset(first_order_structure,Antibody=="CB6"),
+                               subset(first_order_structure,Antibody=="CoV555"),
+                               subset(first_order_structure,Antibody=="REGN10987"),
+                               subset(first_order_structure,Antibody=="S309"))
+
+first_order_structure$Antibody.used <- factor(first_order_structure$Antibody.used,
+                                              levels=c("LY-CoV016","LY-CoV555","REGN10987","S309"))
+
+first_order_structure$Antibody.rev <-  factor(first_order_structure$Antibody.used,
+                                              levels=rev(c("LY-CoV016","LY-CoV555","REGN10987","S309")))
+
+first_order_structure$single.effect<- Kds_effect_summarized$Mean[
+  match(interaction(first_order_structure$Term,first_order_structure$Antibody),
+        interaction(Kds_effect_summarized$Mutation,Kds_effect_summarized$Antibody))]
+
+#codes to generate the triangles in the heatmap
+make_triangles <- function(x, y, point = "up") {
+  x <- as.integer(as.factor((x)))
+  y <- as.integer(as.factor((y)))
+  
+  if (point == "up") {
+    newx <- sapply(x, function(x) {
+      c(x - 0.5, x - 0.5, x + 0.5)
+    }, simplify = FALSE)
+    newy <- sapply(y, function(y) {
+      c(y - 0.5, y + 0.5, y + 0.5)
+    }, simplify = FALSE)
+  } else if (point == "down") {
+    newx <- sapply(x, function(x) {
+      c(x - 0.5, x + 0.5, x + 0.5)
+    }, simplify = FALSE)
+    newy <- sapply(y, function(y) {
+      c(y - 0.5, y - 0.5, y + 0.5)
+    }, simplify = FALSE)
+  }
+  data.frame(x = unlist(newx), y = unlist(newy))
+}
+newcoord_up <- make_triangles(first_order_structure$Term, first_order_structure$Antibody.rev)
+newcoord_down <- make_triangles(first_order_structure$Term, first_order_structure$Antibody.rev, point = "down")
+newcoord_down <- newcoord_down %>% select(xdown = x, ydown = y)
+first_order_structure.new <- map_df(1:nrow(first_order_structure), function(i) first_order_structure[rep(i, 3), ])
+newdata <- bind_cols(first_order_structure.new, newcoord_up, newcoord_down)
+
+# vary mutation labels based on contact
+mutation.color <- c("#876399",
+                    "black",
+                    "black",
+                    "black",
+                    "#3989BD",
+                    "#C2846E",
+                    "#D4A158",
+                    "#3989BD",
+                    "black",
+                    "#729395",
+                    "#729395",
+                    "black",
+                    "#D4A158",
+                    "#3989BD",
+                    "#3989BD")
+
+newdata$Antibody.used <- factor(newdata$Antibody.used,
+                                              levels=rev(c("LY-CoV016","LY-CoV555","REGN10987","S309")))
+
+
+ggplot(newdata) +
+  geom_polygon(aes(x = x, y = y, fill = single.effect, group = interaction(Term, Antibody.rev)), 
+               color = "black",
+               size=0.05) +
+  scale_fill_gradient2(low = brewer.pal(8,"Set1")[2],
+                       mid = "white",
+                       high = brewer.pal(8,"Set1")[1],
+                       midpoint = 0,
+                       guide = "colorbar")+
+  labs(fill=expression(paste("Mean Effect on",-log~italic(K)[paste("D", ",", "app")]," (-log M)")))+
+  ggnewscale::new_scale_fill() +
+  
+  geom_polygon(aes(x = xdown, y = ydown, 
+                   fill = Buried_SA.nb2, group = interaction(Term, Antibody.rev)), 
+               color = "black",
+               size=0.05) +
+  scale_fill_gradient2(low = "#009E73",
+                       mid = "white",
+                       high = "#FFD92F",
+                       midpoint = 0,
+                       guide = "colorbar")+
+  labs(fill=expression(paste("Contact Surface Area (",ring(A),{}^2,")")))+
+  xlab("Mutation") +
+  ylab("Antibody") +  
+  scale_x_continuous(breaks = seq_along(unique(first_order_structure$Term)), 
+                     labels = unique(levels(first_order_structure$Term))) +
+  scale_y_continuous(breaks = rev(seq_along(unique(first_order_structure$Antibody.used))),
+                     labels = unique(first_order_structure$Antibody.used))+
+  coord_equal()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5,color=mutation.color),
+        axis.text=element_text(size=12,color="black"),
+        legend.text=element_text(size=10,vjust=1),
+        legend.title=element_text(size=11,vjust=0.6),
+        axis.title=element_text(size=14),
+        legend.position="top",
+        legend.key.size = unit(0.8, "lines"),
+        legend.key.width = unit(0.2, "in"),
+        #legend.margin=margin(0,0,0,0),
+        legend.justification = "top"
+  )
+ggsave("figures/Figure1_buried_surface_area_with_legend_heatmap.png", width = 8, height = 2, units = "in")
 ```
 
-jitter plots
+Figure 1D-G: Kd Distribution across Numbers of Mutations 
 ```{r jitter plots per ab}
 ###Plot FIGURE 1B###
 color.antibodies <- getPalettePairedLong(15)[c(4,6,10,12)]
@@ -514,52 +615,10 @@ ggplot(subset(Kds_simplified,Antibody=="S309"), aes(x=Class, y = Log10Kd.nb))+
              aes(yintercept = Kd),colour = "black", linetype = "dashed")
 
 ggsave("figures/Figure1_boxplot_and_jitters_Kds_across_numb_mutations_S309_double_fragmented.png", width = 3.75, height = 2.5, units = "in")
-
-###Plot FIGURE 1C###
-for(i in antibodies){
-  Kds_mutational_effects.long<-subset(Kds_mutational_effects.long.all.abs,
-                                      Antibody==i)
-  ggplot(Kds_mutational_effects.long, aes(x=Mutation, y = `KD Effect`))+
-    #geom_jitter(height = 0.2, width = 0.2, size=0.1,alpha = 0.1, color="#b9b9b9",aes( fill = Mutation))+
-    geom_boxplot(width=0.5, aes(fill=Mutation), color ="#333333",alpha = 0.75, size =0.25,outlier.shape=NA) +
-    #stat_summary(fun.data=data_summary,geom="pointrange", size=0.25,color="black")+
-    #geom_boxplot(width=0.15, color="#333333", alpha = 0.5) +
-    geom_point(data=Kds_mutational_effects.long[Kds_mutational_effects.long$Genotype==strrep('0',14),],
-               aes(x=Mutation, y = `KD Effect`),position = position_nudge(x = -0.15),size=1.5,
-               colour = brewer.pal(n = 8, name = "Set1")[2])+ #also distinctively color the point that corresponds to wuhan background
-    geom_errorbar(data=Kds_mutational_effects.long[Kds_mutational_effects.long$Genotype==strrep('0',14),],
-                  aes(ymin=`KD Effect`-`Effect Error`, ymax=`KD Effect`+`Effect Error`), width=.01,
-                  position = position_nudge(x = -0.15),colour = brewer.pal(n = 8, name = "Set1")[2])+
-    geom_point(data=Kds_mutational_effects.long[Kds_mutational_effects.long$Genotype==strrep('1',14),],
-               aes(x=Mutation, y = `KD Effect`),position = position_nudge(x = 0.15),size=1.5,
-               colour = brewer.pal(n = 8, name = "Set1")[1])+ #also distinctively color the point that corresponds to om background
-    geom_errorbar(data=Kds_mutational_effects.long[Kds_mutational_effects.long$Genotype==strrep('1',14),],
-                  aes(ymin=`KD Effect`-`Effect Error`, ymax=`KD Effect`+`Effect Error`), width=.01,
-                  position = position_nudge(x = 0.15),colour = brewer.pal(n = 8, name = "Set1")[1])+
-    scale_color_manual(values = getPalettePairedLong(15))+
-    scale_fill_manual(values = getPalettePairedLong(15))+
-    scale_x_discrete(expand=c(0,0))+
-    #ylim(-5,5)+
-    xlab("Mutation") +
-    labs(y=expression(Delta~(-log~italic(K)[paste("D", ",", "app")]))) +
-    #geom_point(data=Kds_mutational_effects.long[Kds_mutational_effects.long$Genotype==strrep('1',14),],
-    #           aes(x=Mutation, y = `KD Effect`),position = position_nudge(x = 0.15),size=1.5,
-    #           colour = brewer.pal(n = 8, name = "Set1")[1])+
-    theme_classic()+
-    theme(axis.text.x = element_text(size=11,angle = 90,hjust = 1, vjust = 0.5),
-          axis.text.y = element_text(size=12),
-          axis.text=element_text(color="black"),
-          legend.text=element_text(size=12),
-          legend.title=element_blank(),
-          axis.title=element_text(size=14),
-          legend.position = "none")+
-    geom_hline(yintercept = 0 , colour = "black", linetype = "dashed")
-  
-  ggsave(paste0("figures/FigureS1_violin_and_jitters_Kd_effect_per_mutation_withoutanythingelse_trimmed_",i,".png"), width = 7.5, height = 3, units = "in")
-}                                                    
 ```
 
 ##Figure 2 - Escape Mutations
+Set Up and Figure 2B: Non-Binding Effects
 ```{r sufficient mutations}
 Kds_mutation_effects.long.filtered <- subset(Kds_mutational_effects.long.all.abs,
                                              `KD WT` > 6)
@@ -633,15 +692,9 @@ ggplot(subset(binding.percentage.long,Antibody!= "S309"), aes(x=Mutation, y=CB6*
         legend.key.size = unit(0.8, "lines"))
 
 ggsave("figures/Figure2_bars_percent_non_effect_binders_is_it_sufficient.png", width = 3.75, height = 2.5, units = "in")
-
-
-#xxx
-x <- 1
-
 ```
 
-
-
+Figure 2A: Frequency amongst Non-Binders
 ```{r required mutations}
 Kds.nonbinders <- subset(Kds_simplified,Log10Kd==6)
 get.mean.nonbinders <- function(df){
@@ -721,9 +774,8 @@ ggplot(nonbinder.per.mutations, aes(x=Mutation, y=Proportion*100, fill = Antibod
 ggsave("figures/FigureSI2_bars_percent_non_binders_when_mutated.png", width = 7.5, height = 3.5, units = "in")
 ```
 
-###Decision tree
+Figure 2C-...: Decision tree
 ```{r decision tree}
-# Modeling packages
 library(rpart)       # direct engine for decision tree application
 library(caret)       # meta engine for decision tree application
 
@@ -734,14 +786,15 @@ library(pdp)         # for feature effects
 library(treeheatr)
 library(partykit)
 library(rattle)
+library(ggparty)
 
-Kds_simplified[paste0('Mutation_', nn)] <- Kds_simplified[paste0('Mutation ', nn)]
-Kds_simplified[nn.muts] <- Kds_simplified[paste0('Mutation ', nn)]
+#Kds_simplified[paste0('Mutation_', nn)] <- Kds_simplified[paste0('Mutation ', nn)]
+#Kds_simplified[nn.muts] <- Kds_simplified[paste0('Mutation ', nn)]
 Kds.abs <- subset(Kds_simplified,Antibody=="CoV555")
-Kds.abs.CoV555 <- subset(Kds_simplified,Antibody=="CoV555")
-Kds.abs.S309 <- subset(Kds_simplified,Antibody=="S309")
-Kds.abs.CB6 <- subset(Kds_simplified,Antibody=="CB6")
-Kds.abs.REGN10987 <- subset(Kds_simplified,Antibody=="REGN10987")
+Kds.abs.CoV555 <- subset(Kds_simplified,Antibody=="CoV555" & (NonBinder | Filtered))
+Kds.abs.S309 <- subset(Kds_simplified,Antibody=="S309" & (NonBinder |Filtered))
+Kds.abs.CB6 <- subset(Kds_simplified,Antibody=="CB6" & (NonBinder |Filtered))
+Kds.abs.REGN10987 <- subset(Kds_simplified,Antibody=="REGN10987" & (NonBinder |Filtered))
 
 Kds.muts.REGN10987 <- select(Kds.abs.REGN10987,c('Log10Kd',nn.muts))
 Kds.muts.CB6 <- select(Kds.abs.CB6,c('Log10Kd',nn.muts))
@@ -758,11 +811,11 @@ Kds.bind.CB6$Binds <- as.factor(ifelse(Kds.bind.CB6$Log10Kd == 6, "Non-Binding",
 Kds.bind.CoV555$Binds <- as.factor(ifelse(Kds.bind.CoV555$Log10Kd == 6, "Non-Binding", "Binding"))
 Kds.bind.S309$Binds <- as.factor(ifelse(Kds.bind.S309$Log10Kd == 6, "Non-Binding", "Binding"))
 
-decision.tree.S309 <- rpart(
-   formula = Log10Kd ~ G339D + S371L + S373P + S375F + K417N + N440K + G446S + 
-    S477N + T478K + E484A + Q493R + G496S + Q498R + N501Y + Y505H ,
-  data    = Kds.muts.S309
-)
+#decision.tree.S309 <- rpart(
+#  formula = Binds ~ G339D + S371L + S373P + S375F + K417N + N440K + G446S + 
+#    S477N + T478K + E484A + Q493R + G496S + Q498R + N501Y + Y505H + 0*Log10Kd,
+#  data    = Kds.bind.S309
+#)
 
 decision.tree.CoV555 <- rpart(
   formula = Binds ~ G339D + S371L + S373P + S375F + K417N + N440K + G446S + 
@@ -781,178 +834,206 @@ decision.tree.REGN10987 <- rpart(
   data    = Kds.bind.REGN10987
 )
 
-getBluetoRed <- colorRampPalette(c('#1F78B4','gray50','#E31A1C'))
+decision.tree.CB6.party <- as.party(decision.tree.CB6)
+decision.tree.REGN10987.party <- as.party(decision.tree.REGN10987)
+decision.tree.CoV555.party <- as.party(decision.tree.CoV555)
+#decision.tree.S309.party <- as.party(decision.tree.S309) 
+tiff("figures/CoV55_decision_tree.tiff", units="in", width = 8, height = 4.8, res = 300)
+ggparty(decision.tree.CoV555.party,terminal_space = 0.4) +
+  geom_edge() +
+  geom_edge_label(size = 3) +
+  geom_node_label(aes(label = splitvar),
+                  ids = "inner",
+                  size=3) +
+  geom_node_plot(gglist = list(geom_bar(aes(x = "", fill = Binds),
+                                        position = position_fill()),
+                               coord_flip(),
+                               theme_void(),
+                               scale_fill_manual(values=c("#3879A6","#C63637")),
+                               theme(legend.position = "none")),
+                 #siz = "nodesize",
+                 shared_legend = FALSE,
+                 height = 0.05)+
+  theme(legend.position = "none")+
+  geom_node_plot(gglist = list(geom_histogram(aes(x = Log10Kd)),
+                               coord_flip(),
+                               theme_bw(),
+                               ylab("Count"),
+                               scale_x_continuous(limits=c(5.9,10.5),breaks=c(6:10),labels=c("NB","7","8","9","10")),
+                               scale_y_log10(breaks=c(1,10,100,1000,10000),labels=c(1,"",100,"",10000),position="left"),
+                               labs(x=expression(-log~italic(K)[paste("D", ",", "app")])),
+                               theme(axis.text.x = element_text(angle = 270,colour="black",hjust = 0, vjust = 0.5,size=8),
+                                     axis.text.y = element_text(colour="black",size=10),
+                                     #axis.text=element_text(size=10),
+                                     legend.text=element_text(size=12),
+                                     legend.title=element_blank(),
+                                     axis.title=element_text(size=12),
+                                     axis.title.y = element_text(angle=90),
+                                     panel.grid.minor.x = element_blank(),
+                                     legend.position = "none",
+                                     panel.spacing = unit(0.7, "lines"),
+                                     strip.text.x = element_blank())),
+                 # draw only one label for each axis
+                 shared_axis_labels = TRUE,
+                 height = 0.95,
+                 nudge_y= -0.025
+                 # draw line between tree and legend
+                 #legend_separator = TRUE
+  )
+dev.off()
 
-#CoV555 histogram
-Kds.muts.CoV555$decision <- case_when(
-  (Kds.muts.CoV555$Q493R== "0" & 
-    Kds.muts.CoV555$E484A == "0") ~ 1,
-  (Kds.muts.CoV555$Q493R== "0" & 
-     Kds.muts.CoV555$E484A == "1" &
-     Kds.muts.CoV555$S375F == "0") ~ 2,
-  (Kds.muts.CoV555$Q493R== "0" & 
-     Kds.muts.CoV555$E484A == "1" &
-     Kds.muts.CoV555$S375F == "1" &
-     Kds.muts.CoV555$N501Y == "0" &
-     Kds.muts.CoV555$S477N == "0") ~ 3,
-  (Kds.muts.CoV555$Q493R== "0" & 
-     Kds.muts.CoV555$E484A == "1" &
-     Kds.muts.CoV555$S375F == "1" &
-     Kds.muts.CoV555$N501Y == "0" &
-     Kds.muts.CoV555$S477N == "1") ~ 4,
-  (Kds.muts.CoV555$Q493R== "0" & 
-     Kds.muts.CoV555$E484A == "1" &
-     Kds.muts.CoV555$S375F == "1" &
-     Kds.muts.CoV555$N501Y == "1") ~ 5,
-  (Kds.muts.CoV555$Q493R== "1" & 
-     Kds.muts.CoV555$E484A == "0" &
-     Kds.muts.CoV555$G446S == "0" &
-     Kds.muts.CoV555$S375F == "0") ~ 6,
-  (Kds.muts.CoV555$Q493R== "1" & 
-     Kds.muts.CoV555$E484A == "0" &
-     Kds.muts.CoV555$G446S == "0" &
-     Kds.muts.CoV555$S375F == "1" &
-     Kds.muts.CoV555$N501Y == "0" ) ~ 7,
-  (Kds.muts.CoV555$Q493R== "1" & 
-     Kds.muts.CoV555$E484A == "0" &
-     Kds.muts.CoV555$G446S == "0" &
-     Kds.muts.CoV555$S375F == "1" &
-     Kds.muts.CoV555$N501Y == "1" ) ~ 8,
-  (Kds.muts.CoV555$Q493R== "1" & 
-     Kds.muts.CoV555$E484A == "0" &
-     Kds.muts.CoV555$G446S == "1" &
-     Kds.muts.CoV555$N501Y == "0" &
-     Kds.muts.CoV555$S375F == "0" ) ~ 9,
-  (Kds.muts.CoV555$Q493R== "1" & 
-     Kds.muts.CoV555$E484A == "0" &
-     Kds.muts.CoV555$G446S == "1" &
-     Kds.muts.CoV555$N501Y == "0" &
-     Kds.muts.CoV555$S375F == "1" ) ~ 10,
-  
-  (Kds.muts.CoV555$Q493R== "1" & 
-     Kds.muts.CoV555$E484A == "0" &
-     Kds.muts.CoV555$G446S == "1" &
-     Kds.muts.CoV555$N501Y == "1") ~ 11,
-  (Kds.muts.CoV555$Q493R== "1" & 
-     Kds.muts.CoV555$E484A == "1") ~ 12
-)
-Kds.muts.CoV555$decision <- factor(Kds.muts.CoV555$decision,levels=1:12)
-Kds.muts.CoV555$Log10Kd.nb <- ifelse(Kds.muts.CoV555$Log10Kd == 6, 5.5, Kds.muts.CoV555$Log10Kd)
-ggplot(Kds.muts.CoV555, aes(Log10Kd.nb)) + 
-  facet_grid(.~decision)+
-  geom_histogram(fill='grey40')+
-  coord_flip()+
-  labs(x=expression(-log~italic(K)[paste("D", ",", "app")])) +
-  ylab("Count") +
-  theme_bw()+
-  scale_y_continuous(limits = c(0,800),breaks=c(0,250,500),labels=c(0,250,"500+"))+
-  scale_x_continuous(breaks=c(5.5,6:11),labels=c("NB",6:11))+
-  #xlim(6.000,11)+
-  #geom_vline(aes(xintercept = wuhan.Kd), colour = brewer.pal(n = 8, name = "Set1")[2],size=1.5)+
-  #geom_vline(aes(xintercept = omicron.Kd), colour = brewer.pal(n = 8, name = "Set1")[1],size=1.5)+
-  theme(axis.text.x = element_text(angle = 270,colour="black",hjust = 0, vjust = 0.5),
-        axis.text.y = element_text(colour="black"),
-        axis.text=element_text(size=11),
-        legend.text=element_text(size=12),
-        legend.title=element_blank(),
-        axis.title=element_text(size=13),
-        panel.grid.minor.x = element_blank(),
-        legend.position = "none",
-        panel.spacing = unit(0.7, "lines"),
-        strip.text.x = element_blank())
-ggsave("figures/Figure4_CoV555_histogram_bw.png", width = 6.5, height = 2, units = "in")
+tiff("figures/REGN10987_decision_tree.tiff", units="in", width = 6, height = 4, res = 300)
+ggparty(decision.tree.REGN10987.party,terminal_space = 0.4) +
+  geom_edge() +
+  geom_edge_label(size = 3) +
+  geom_node_label(aes(label = splitvar),
+                  ids = "inner",
+                  size=3) +
+  geom_node_plot(gglist = list(geom_bar(aes(x = "", fill = Binds),
+                                        position = position_fill()),
+                               coord_flip(),
+                               theme_void(),
+                               scale_fill_manual(values=c("#3879A6","#C63637")),
+                               theme(legend.position = "none")),
+                 #siz = "nodesize",
+                 shared_legend = FALSE,
+                 height = 0.05)+
+  theme(legend.position = "none")+
+  geom_node_plot(gglist = list(geom_histogram(aes(x = Log10Kd)),
+                               coord_flip(),
+                               theme_bw(),
+                               ylab("Count"),
+                               scale_x_continuous(limits=c(5.9,10.5),breaks=c(6:10),labels=c("NB","7","8","9","10")),
+                               scale_y_log10(breaks=c(1,10,100,1000,10000),labels=c(1,"",100,"",10000),position="left"),
+                               labs(x=expression(-log~italic(K)[paste("D", ",", "app")])),
+                               theme(axis.text.x = element_text(angle = 270,colour="black",hjust = 0, vjust = 0.5,size=8),
+                                     axis.text.y = element_text(colour="black",size=10),
+                                     #axis.text=element_text(size=10),
+                                     legend.text=element_text(size=12),
+                                     legend.title=element_blank(),
+                                     axis.title=element_text(size=12),
+                                     axis.title.y = element_text(angle=90),
+                                     panel.grid.minor.x = element_blank(),
+                                     legend.position = "none",
+                                     panel.spacing = unit(0.7, "lines"),
+                                     strip.text.x = element_blank())),
+                 # draw only one label for each axis
+                 shared_axis_labels = TRUE,
+                 height = 0.95,
+                 nudge_y= -0.025
+                 # draw line between tree and legend
+                 #legend_separator = TRUE
+  )
+dev.off()
 
-#REGN10987 histogram
-Kds.muts.REGN10987$decision <- case_when(
-  (Kds.muts.REGN10987$G446S== "0") ~ 1,
-  (Kds.muts.REGN10987$G446S== "1" & 
-     Kds.muts.REGN10987$N440K == "0") ~ 2,
-  (Kds.muts.REGN10987$G446S== "1" & 
-     Kds.muts.REGN10987$N440K == "1") ~ 3
-)
-Kds.muts.REGN10987$decision <- factor(Kds.muts.REGN10987$decision,levels=1:3)
-Kds.muts.REGN10987$Log10Kd.nb <- ifelse(Kds.muts.REGN10987$Log10Kd == 6, 5.5, Kds.muts.REGN10987$Log10Kd)
-ggplot(Kds.muts.REGN10987, aes(Log10Kd.nb)) + 
-  facet_wrap(decision~., dir = "v")+
-  geom_histogram(fill='grey40')+
-  #coord_flip()+
-  labs(x=expression(-log~italic(K)[paste("D", ",", "app")])) +
-  ylab("Count") +
-  theme_bw()+
-  scale_y_log10(breaks=c(1,10,100,1000,10000),labels=c(1,"",100,"",10000),position="right")+
-  scale_x_continuous(breaks=c(5.5,6:11),labels=c("NB",6:11))+
-  #xlim(6.000,11)+
-  #geom_vline(aes(xintercept = wuhan.Kd), colour = brewer.pal(n = 8, name = "Set1")[2],size=1.5)+
-  #geom_vline(aes(xintercept = omicron.Kd), colour = brewer.pal(n = 8, name = "Set1")[1],size=1.5)+
-  theme(axis.text.x = element_text(angle = 90,colour="black",hjust = 1, vjust = 0.5),
-        axis.text.y = element_text(colour="black"),
-        axis.text=element_text(size=10.5),
-        legend.text=element_text(size=12),
-        legend.title=element_blank(),
-        axis.title=element_text(size=13),
-        panel.grid.minor.x = element_blank(),
-        legend.position = "none",
-        panel.spacing = unit(0.7, "lines"),
-        strip.text.x = element_blank())
-ggsave("figures/Figure4_REGN10987_histogram_bw.png", width = 2.4, height = 2.1, units = "in")
+tiff("figures/CB6_decision_tree.tiff", units="in", width = 2, height = 4, res = 300)
+ggparty(decision.tree.CB6.party,terminal_space = 0.4) +
+  geom_edge() +
+  geom_edge_label(size = 3) +
+  geom_node_label(aes(label = splitvar),
+                  ids = "inner",
+                  size=3) +
+  geom_node_plot(gglist = list(geom_bar(aes(x = "", fill = Binds),
+                                        position = position_fill()),
+                               coord_flip(),
+                               theme_void(),
+                               scale_fill_manual(values=c("#3879A6","#C63637")),
+                               theme(legend.position = "none")),
+                 #siz = "nodesize",
+                 shared_legend = FALSE,
+                 height = 0.05)+
+  theme(legend.position = "none")+
+  geom_node_plot(gglist = list(geom_histogram(aes(x = Log10Kd)),
+                               coord_flip(),
+                               theme_bw(),
+                               ylab("Count"),
+                               scale_x_continuous(limits=c(5.9,10.5),breaks=c(6:10),labels=c("NB","7","8","9","10")),
+                               scale_y_log10(breaks=c(1,10,100,1000,10000),labels=c(1,"",100,"",10000),position="left"),
+                               labs(x=expression(-log~italic(K)[paste("D", ",", "app")])),
+                               theme(axis.text.x = element_text(angle = 270,colour="black",hjust = 0, vjust = 0.5,size=8),
+                                     axis.text.y = element_text(colour="black",size=10),
+                                     #axis.text=element_text(size=10),
+                                     legend.text=element_text(size=12),
+                                     legend.title=element_blank(),
+                                     axis.title=element_text(size=12),
+                                     axis.title.y = element_text(angle=90,vjust=-0.7),
+                                     panel.grid.minor.x = element_blank(),
+                                     legend.position = "none",
+                                     panel.spacing = unit(0.7, "lines"),
+                                     strip.text.x = element_blank())),
+                 # draw only one label for each axis
+                 shared_axis_labels = TRUE,
+                 height = 0.95,
+                 nudge_y= -0.025
+                 # draw line between tree and legend
+                 #legend_separator = TRUE
+  )
+dev.off()
+```
 
-#CB6 histo
-Kds.muts.CB6$decision <- case_when(
-  (Kds.muts.CB6$K417N== "0") ~ 1,
-  (Kds.muts.CB6$K417N== "1")~2
-)
-Kds.muts.CB6$decision <- factor(Kds.muts.CB6$decision,levels=1:2)
-Kds.muts.CB6$Log10Kd.nb <- ifelse(Kds.muts.CB6$Log10Kd == 6, 5.5, Kds.muts.CB6$Log10Kd)
-ggplot(Kds.muts.CB6, aes(Log10Kd.nb)) + 
-  facet_wrap(decision~., dir = "v")+
-  geom_histogram(fill='grey40')+
-  #coord_flip()+
-  labs(x=expression(-log~italic(K)[paste("D", ",", "app")])) +
-  ylab("Count") +
-  theme_bw()+
-  scale_y_log10(breaks=c(1,10,100,1000,10000),labels=c(1,"",100,"",10000),position="right")+
-  scale_x_continuous(breaks=c(5.5,6:11),labels=c("NB",6:11))+
-  #xlim(6.000,11)+
-  #geom_vline(aes(xintercept = wuhan.Kd), colour = brewer.pal(n = 8, name = "Set1")[2],size=1.5)+
-  #geom_vline(aes(xintercept = omicron.Kd), colour = brewer.pal(n = 8, name = "Set1")[1],size=1.5)+
-  theme(axis.text.x = element_text(angle = 90,colour="black",hjust = 1, vjust = 0.5),
-        axis.text.y = element_text(colour="black"),
-        axis.text=element_text(size=10.5),
-        legend.text=element_text(size=12),
+## Figure 3 - Epistasis and Alternative Pathways
+Figure 3A: Choosing the best model
+```{r best model}
+models.df <- read.delim("data/CV_rsquared.csv" ,skip = 0,header = TRUE, sep = ",", dec = ".",
+                        colClasses=c("factor","numeric","numeric","numeric"))
+
+models.df$Type <- factor(models.df$Type,levels=c("LY-CoV016","LY-CoV555","REGN10987","S309","ACE2"))
+ggplot(models.df, aes(x=Order, y=Mean, color = Type))+
+  geom_point(size=3,alpha=0.7)+
+  #scale_color_manual(values=c(antibody.colors,"#121212"))+
+  geom_errorbar(aes(ymin=Mean-Std, ymax=Mean+Std), width=.2,colour = "#666666") +
+  xlab("Order of Epistatic Model") +
+  ylab("Correlation Coefficient") +
+  geom_smooth(method = "loess", se = FALSE, linetype = "dashed")+
+  scale_x_continuous(breaks=1:6)+
+  scale_color_manual(values=c(antibody.colors,"#121212"))+
+  theme_classic()+
+  #geom_hline(aes(yintercept = 9.908776e-01), colour = "gray")+
+  theme(axis.text.x = element_text(angle = 0),
+        axis.text=element_text(size=12),
+        legend.text=element_text(size=11),
         legend.title=element_blank(),
-        axis.title=element_text(size=13),
-        panel.grid.minor.x = element_blank(),
-        legend.position = "none",
-        panel.spacing = unit(0.7, "lines"),
-        strip.text.x = element_blank())
-ggsave("figures/Figure4_CB6_histogram_bw.png", width = 2.4, height = 1.6, units = "in")
+        axis.title=element_text(size=14),
+        legend.position = c(.6,.17))+
+  guides(colour = guide_legend(nrow = 3))
+
+ggsave("figures/Figure3_choosing_model.png", width = 3, height = 4, units = "in")
 
 ```
-## Figure 3--Epistasis and Alternative Pathways
-Figure 3: Epistasis.
-```{r epistasis data loading}
-required.CoV555 <- c("E484A","Q493R")
-required.REGN10987 <- c("N440K","G446S")
-required.CB6 <- c("K417N")
-biochem.first.order <- subset(epistasis.biochem,Order=="1")
-#biochem.first.order <- biochem.first.order %>% 
-#  mutate(Coefficient.Updated = case_when(
-#    Antibody == "CoV555" & `Term 1` %in% required.CoV555 ~ -0.6,
-#    Antibody == "CB6" & `Term 1` %in% required.CB6 ~ -0.6,
-#    Antibody == "REGN10987" & `Term 1` %in% required.REGN10987 ~ -0.6,
-#    Coefficient < -0.3 ~ Coefficient + 0.5,
-#    TRUE ~ Coefficient
-#  )
-#)
-antibody.colors <- c(getPalettePairedLong(15)[4],getPalettePairedLong(15)[6],
-                     getPalettePairedLong(15)[8],getPalettePairedLong(15)[10])
-biochem.first.order$Coefficient.nb <- ifelse(biochem.first.order$Coefficient > (-0.7),
-                                             biochem.first.order$Coefficient,
-                                             (biochem.first.order$Coefficient + 1) * .2/2 - 0.9)
 
-epistasis.biochem$Coefficient.nb <- ifelse(epistasis.biochem$Standard.Error > 1, NA, epistasis.biochem$Coefficient)
-#biochem.first.order$mask <- 0
-#biochem.first.order$mask[biochem.first.order$Coefficient.Updated < (-0.4)] <- 1
+Figure SI: epistasis analyses
+```{r epistasis coefficients}
+library(ggtext)
+library(plyr)
+library(ggplot2)
+library(RColorBrewer)
+library(stringr)
+library(gtools)
+library(ggpmisc)
+library(tidyr)
+library(dplyr)
+library(ggnewscale)
+library(ggrepel)
+library(paletteer)
+library(cowplot)
+library(Rmisc)
+library(scales)
+
+CoV555 <- read.delim("data/lasso_version_CoV555_aic_3_order_biochem.txt" ,skip = 1,header = TRUE, sep = "\t", dec = ".")#[-1,]
+S309<- read.delim("data/thomas_version_S309_aic_4_order_biochem.txt" ,skip = 1,header = TRUE, sep = "\t", dec = ".")#[-1,]
+CB6 <- read.delim("data/lasso_version_CB6_aic_4_order_biochem.txt" ,skip = 1,header = TRUE, sep = "\t", dec = ".")#[-1,]
+REGN10987 <- read.delim("data/lasso_version_REGN10987_aic_2_order_biochem.txt" ,skip = 1,header = TRUE, sep = "\t", dec = ".")#[-1,]
+ACE2 <- read.delim("data/ACE2_5_order_biochem.txt" ,skip = 1,header = TRUE, sep = "\t", dec = ".")#[-1,]
+
+epistasis.biochem <- AppendMe(c("CB6","CoV555","REGN10987","S309","ACE2"))
+#epistasis.stat <- read.delim("data/ACE2_4order_stat.txt",skip = 2,header = TRUE, sep = "\t", dec = ".")
+epistasis.biochem$Order <- ifelse(epistasis.biochem$Term == "Intercept",0,str_count(epistasis.biochem$Term, pattern = ",")+1)
+#epistasis.stat$Order <- ifelse(epistasis.stat$Term == "Intercept",0,str_count(epistasis.stat$Term, pattern = ",")+1)
+epistasis.biochem <- separate(data = epistasis.biochem, col = Term, into = c("Term 1", "Term 2", "Term 3", "Term 4", "Term 5"), sep = ",")
+epistasis.biochem[,1:5] <- apply(epistasis.biochem[,1:5],2,mapvalues,from=n,to=nn.muts)
+epistasis.biochem[,1:5]<- lapply(epistasis.biochem[,1:5], function(X){ordered(X,levels = nn.muts,labels=nn.muts)})
+
+antibody.colors  <- getPalettePairedLong(6)[2:5]
 
 #bunch of rearranging the terms and coefficients
 summing_coefficient <- function(x,y){
@@ -980,58 +1061,18 @@ summing_coefficient_to_one <- function(x,y){
     rowSums(x[1] == y,na.rm=TRUE) > 0 ],na.rm=TRUE)
   ))
 }
-epistasis.biochem.higher <- subset(epistasis.biochem,Order %in% c("3","4","5","6")) #higher order than 2
+epistasis.biochem$p.value <- abs(epistasis.biochem$Standard.Error)/abs(epistasis.biochem$Coefficient)
+epistasis.biochem$Coefficient.nb <- ifelse(epistasis.biochem$p.value > 1 & epistasis.biochem$Order > 1,
+                                           0, epistasis.biochem$Coefficient)  #ifelse(epistasis.biochem$p.value > 0.5 & epistasis.biochem$Order > 1,0, epistasis.biochem$Coefficient)
+epistasis.biochem.higher <- subset(epistasis.biochem,Order %in% c("3","4")) #higher order than 2
 #epistasis.biochem.higher$one <- 1
 epistasis.biochem.temp <- subset(epistasis.biochem,Order%in%c("1","2")) #only 2nd order
-
-#epistasis.biochem.higher <- epistasis.biochem.higher %>% 
-#  mutate(Coefficient = case_when(
-#    Antibody == "CoV555" & (`Term 1` %in% required.CoV555 | 
-#                            `Term 2` %in% required.CoV555 |
-#                            `Term 3` %in% required.CoV555 |
-#                            `Term 4` %in% required.CoV555)~ NA_real_,
-#    Antibody == "CB6" & (`Term 1` %in% required.CB6 | 
-#                            `Term 2` %in% required.CB6 |
-#                            `Term 3` %in% required.CB6 |
-#                            `Term 4` %in% required.CB6) ~ NA_real_,
-#    Antibody == "REGN10987" & (`Term 1` %in% required.REGN10987 | 
-#                            `Term 2` %in% required.REGN10987 |
-#                            `Term 3` %in% required.REGN10987 |
-#                            `Term 4` %in% required.REGN10987) ~ NA_real_,
-#    TRUE ~ Coefficient
-#  )
-#)
-
-#epistasis.biochem.temp <- epistasis.biochem.temp %>% 
-#  mutate(Coefficient = case_when(
-#    Antibody == "CoV555" & (`Term 1` %in% required.CoV555 | 
-#                            `Term 2` %in% required.CoV555 |
-#                            `Term 3` %in% required.CoV555 |
-#                            `Term 4` %in% required.CoV555)~ NA_real_,
-#    Antibody == "CB6" & (`Term 1` %in% required.CB6 | 
-#                            `Term 2` %in% required.CB6 |
-#                            `Term 3` %in% required.CB6 |
-#                            `Term 4` %in% required.CB6) ~ NA_real_,
-#    Antibody == "REGN10987" & (`Term 1` %in% required.REGN10987 | 
-#                            `Term 2` %in% required.REGN10987 |
-#                            `Term 3` %in% required.REGN10987 |
-#                            `Term 4` %in% required.REGN10987) ~ NA_real_,
-#    TRUE ~ Coefficient
-#  )
-#)
-
-epistasis.temp.temp <- NULL
-epistasis.temp.temp2 <- NULL
-epistasis.temp.temp3 <- NULL
-epistasis.temp.temp4 <- NULL
-epistasis.temp.temp5 <- NULL
-epistasis.temp.temp6 <- NULL
 
 for(i in antibodies){
   epistasis.temp.higher<-subset(epistasis.biochem.higher,Antibody==i)
   epistasis.temp <- subset(epistasis.biochem.temp,Antibody==i)
   epistasis.temp.temp <- subset(epistasis.temp,Order=="2")
-
+  
   epistasis.temp.temp$t1 <- epistasis.temp.temp$`Term 2`
   epistasis.temp.temp$t2 <- epistasis.temp.temp$`Term 1`
   epistasis.temp.temp$part <- "A"
@@ -1070,24 +1111,30 @@ for(i in antibodies){
 }
 epistasis.biochem.df.all <- rbind(epistasis.biochem.df.all.CoV555,epistasis.biochem.df.all.S309,
                                   epistasis.biochem.df.all.CB6,epistasis.biochem.df.all.REGN10987)
-```
 
-```{r epistasis figure}
-###Plot FIGURE 2A###
-#just good ol linear effects
-ggplot(biochem.first.order, aes(x=`Term 1`, y=Coefficient.nb, fill = Antibody))+
+
+###PLOTS NOWW
+biochem.first.order <- subset(epistasis.biochem,Order=="1")
+biochem.first.order$Coefficient.nb2 <- ifelse(biochem.first.order$Coefficient.nb<(-0.5),
+                                              (biochem.first.order$Coefficient.nb+0.5)*0.2-.5,
+                                              biochem.first.order$Coefficient.nb)
+biochem.first.order$Error.nb2 <- ifelse(biochem.first.order$Coefficient.nb<(-.5),
+                                        biochem.first.order$Standard.Error*0.2,
+                                        biochem.first.order$Standard.Error)
+
+ggplot(biochem.first.order, aes(x=`Term 1`, y=Coefficient.nb2, fill = Antibody))+
   geom_bar(stat='identity',color="#333333",position = position_dodge())+
-  #geom_errorbar(aes(ymin=Coefficient-Standard.Error, ymax=Coefficient+Standard.Error), width=.6,
-  #              position=position_dodge(.9), colour = "#969696",size=0.7) +
+  geom_errorbar(aes(ymin=Coefficient.nb2-Error.nb2, ymax=Coefficient.nb2+Error.nb2), width=.6,
+                position=position_dodge(.9), colour = "#969696",size=0.7) +
   scale_fill_manual(values=getPalettePairedLong(6)[2:5])+
   #scale_fill_manual(values = antibody.colors)+
   #scale_y_continuous(trans = squash_axis(5,95,10))+
-  scale_y_continuous(breaks = c(-1.2,-1.05,-0.9,-0.6,-0.3,0,0.3,0.6),
-                    labels = c("-4","-2.5","-1","-0.6","-0.3","0","0.3","0.6"),
-  #                   trans = squash_axis(-0.8,-0.4,10)
-                     )+
+  scale_y_continuous(breaks = c(-1.8,-1.4,-1,-0.6,-0.3,0,0.3),
+                     labels = c("-7","-5","-3","-1","-0.3","0","0.3"),
+                     #                   trans = squash_axis(-0.8,-0.4,10)
+  )+
   #geom_segment(x=-2,xend=15,y=-0.3,yend=-0.3,size=0.5,color="white")+
-  geom_hline(yintercept=-0.75,size=2,color="white")+
+  geom_hline(yintercept=-0.5,size=2,color="white")+
   xlab("Mutation") +
   ylab("Linear Effect") +
   theme_classic()+
@@ -1100,567 +1147,258 @@ ggplot(biochem.first.order, aes(x=`Term 1`, y=Coefficient.nb, fill = Antibody))+
         legend.title=element_blank(),
         axis.title=element_text(size=14),
         legend.key.size = unit(0.5, "lines"))
-
 ggsave("figures/Figure2_bars_linear_effects_combined_with break.png", width = 4.5, height = 3.5, units = "in")
+ggsave("figures/THOMAS_TOBIT_Figure2_bars_linear_effects_combined_with break.png", width = 4.5, height = 3.5, units = "in")
 
-###Plot FIGURE 2B###
-for (i in antibodies[1:3]) {
+biochem.first.order$Antibody.used <- ifelse(biochem.first.order$Antibody=="CB6","LY-CoV016",
+                                            ifelse(biochem.first.order$Antibody=="CoV555",
+                                                   "LY-CoV555",
+                                                   as.character(biochem.first.order$Antibody)))
+
+biochem.first.order$Antibody.used<-factor(biochem.first.order$Antibody.used,
+                                          levels = rev(c("LY-CoV016","LY-CoV555","REGN10987","S309","ACE2"))
+)
+
+
+
+ggplot(biochem.first.order) + 
+  geom_tile(mapping=aes(x=`Term 1`, y=`Antibody.used`, fill= `Coefficient.nb2`)) +
+  scale_fill_gradient2(breaks = c(-1.8,-1.4,-1,-0.6,-0.3,0,0.3),
+                       labels = c("-7","-5","-3","-1","-0.3","0","0.3"),
+                       low = brewer.pal(8,"Set1")[2],
+                       mid = "white",
+                       high = brewer.pal(8,"Set1")[1],
+                       midpoint = 0,
+                       guide = "colorbar") + 
+  labs(fill="First-Order\nCoefficients")+
+  xlab("Mutation") +
+  ylab("Antibody") +
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
+        axis.text=element_text(size=12,color="black"),
+        legend.text=element_text(size=10,angle=0,hjust=0,vjust=0.5),
+        legend.title=element_text(size=11,vjust=0.75),
+        axis.title=element_text(size=14),
+        legend.position="right",
+        legend.key.height = unit(0.28, "in"),
+        legend.justification = "top")
+ggsave("figures/Figure3_summary_table_linear.png", width = 7.5, height = 2.4, units = "in")
+
+#S309
+#epistasis.biochem.df.all$Coefficient.nb2 <- ifelse(epistasis.biochem.df.all$Coefficient.nb < -0.75,
+#                                                   -0.75,
+#                                                   epistasis.biochem.df.all$Coefficient.nb)
+for(i in antibodies){
   epistasis.biochem.df2 <- subset(epistasis.biochem.df.all,Antibody==i)
-  ggplot() + 
-  geom_tile(data = subset(epistasis.biochem.df2,second =="Pairwise"),
-            mapping=aes(x=`Term 1`, y=`Term 2`, fill= `Coefficient.nb`)) +
-  scale_fill_gradient2(limits = c(-1.5,3.5),low = brewer.pal(8,"Set1")[2],
-                       mid = "white",
-                       high = brewer.pal(8,"Set1")[1],
-                       midpoint = 0,
-                       guide = "colorbar") + 
-  labs(fill="Second \nOrder ")+
-  new_scale_fill()+
-  geom_tile(data = subset(epistasis.biochem.df2,part %in% c("D")),
-                          mapping=aes(`Term 1`, `Term 2`, fill= `Coefficient.nb`)) +
-  scale_fill_gradient2(limits = c(-10,20),low ="#998ec3",
-                       mid = "white",
-                       high = "#f1a340",
-                       midpoint = 0,
-                       na.value = "#303030",
-                       guide = "colorbar") +
-  labs(fill="Higher \nOrder ")+
-  xlab("Mutation 1") +
-  ylab("Mutation 2") +
-  theme_classic()+
-  facet_grid(rows=vars(second),scales="free",space="free_y")+
-  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
-        axis.text=element_text(size=11,color="black"),
-        #legend.text=element_text(size=12),
-        legend.title=element_text(size=11,hjust = 1, vjust = 1),
-        axis.title=element_text(size=13),
-        legend.position="none",
-        legend.spacing.x = unit(0, 'cm'))
-
-  ggsave(paste0("figures/Figure2_heatmap_second_order_and_higher_orders_",i,".png"), width = 4, height = 4.1, units = "in")
-}
-
-### S309
-epistasis.biochem.df2 <- subset(epistasis.biochem.df.all,Antibody=="S309")
-ggplot() + 
-  geom_tile(data = subset(epistasis.biochem.df2,second =="Pairwise"),
-            mapping=aes(x=`Term 1`, y=`Term 2`, fill= `Coefficient.nb`)) +
-  scale_fill_gradient2(limits = c(-0.6,0.6),low = brewer.pal(8,"Set1")[2],
-                       mid = "white",
-                       high = brewer.pal(8,"Set1")[1],
-                       midpoint = 0,
-                       guide = "colorbar") + 
-  labs(fill="Second \nOrder ")+
-  new_scale_fill()+
-  geom_tile(data = subset(epistasis.biochem.df2,part %in% c("D")),
-                          mapping=aes(`Term 1`, `Term 2`, fill= `Coefficient.nb`)) +
-  scale_fill_gradient2(limits = c(-1,1),low ="#998ec3",
-                       mid = "white",
-                       high = "#f1a340",
-                       midpoint = 0,
-                       na.value = "#303030",
-                       guide = "colorbar") +
-  labs(fill="Higher \nOrder ")+
-  xlab("Mutation 1") +
-  ylab("Mutation 2") +
-  theme_classic()+
-  facet_grid(rows=vars(second),scales="free",space="free_y")+
-  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
-        axis.text=element_text(size=10,color="black"),
-        legend.text=element_text(size=7,hjust = 0.5, vjust = 0.5),
-        legend.title=element_text(size=10,hjust = 0.5, vjust = 1),
-        axis.title=element_text(size=13),
-        legend.position="right",
-        legend.key.size = unit(0.6, "lines"),
-        strip.text = element_text(size = 8),
-        strip.switch.pad.grid = unit(0.1,"cm"),
-        legend.spacing.x = unit(0, 'cm'))
-
-ggsave(paste0("figures/Figure2_heatmap_second_order_and_higher_orders_","S309",".png"), width = 4, height = 3.1, units = "in")
-
-###REGN 10987
-epistasis.biochem.df2 <- subset(epistasis.biochem.df.all,Antibody=="REGN10987")
-ggplot() + 
-  geom_tile(data = subset(epistasis.biochem.df2,second =="Pairwise"),
-            mapping=aes(x=`Term 1`, y=`Term 2`, fill= `Coefficient.nb`)) +
-  scale_fill_gradient2(limits = c(-2.2,2.2),low = brewer.pal(8,"Set1")[2],
-                       mid = "white",
-                       high = brewer.pal(8,"Set1")[1],
-                       midpoint = 0,
-                       guide = "colorbar") + 
-  labs(fill="Second \nOrder ")+
-  new_scale_fill()+
-  geom_tile(data = subset(epistasis.biochem.df2,part %in% c("D")),
-            mapping=aes(`Term 1`, `Term 2`, fill= `Coefficient.nb`)) +
-  scale_fill_gradient2(limits = c(-14,14),low ="#998ec3",
-                       mid = "white",
-                       high = "#f1a340",
-                       midpoint = 0,
-                       na.value = "#303030",
-                       guide = "colorbar") +
-  labs(fill="Higher \nOrder ")+
-  xlab("Mutation 1") +
-  ylab("Mutation 2") +
-  theme_classic()+
-  facet_grid(rows=vars(second),scales="free",space="free_y")+
-  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
-        axis.text=element_text(size=10,color="black"),
-        legend.text=element_text(size=7,hjust = 0.5, vjust = 0.5),
-        legend.title=element_text(size=10,hjust = 0.5, vjust = 1),
-        axis.title=element_text(size=13),
-        legend.position="right",
-        legend.key.size = unit(0.6, "lines"),
-        strip.text = element_text(size = 8),
-        strip.switch.pad.grid = unit(0.1,"cm"),
-        legend.spacing.x = unit(0, 'cm'))
-
-ggsave(paste0("figures/Figure2_heatmap_second_order_and_higher_orders_","REGN10987",".png"), width = 4, height = 3.1, units = "in")
-
-### CoV555
-epistasis.biochem.df2 <- subset(epistasis.biochem.df.all,Antibody=="CoV555")
-ggplot() + 
-  geom_tile(data = subset(epistasis.biochem.df2,second =="Pairwise"),
-            mapping=aes(x=`Term 1`, y=`Term 2`, fill= `Coefficient.nb`)) +
-  scale_fill_gradient2(limits = c(-3.2,3.2),low = brewer.pal(8,"Set1")[2],
-                       mid = "white",
-                       high = brewer.pal(8,"Set1")[1],
-                       midpoint = 0,
-                       guide = "colorbar") + 
-  labs(fill="Second \nOrder ")+
-  new_scale_fill()+
-  geom_tile(data = subset(epistasis.biochem.df2,part %in% c("D")),
-            mapping=aes(`Term 1`, `Term 2`, fill= `Coefficient.nb`)) +
-  scale_fill_gradient2(limits = c(-19,19),low ="#998ec3",
-                       mid = "white",
-                       high = "#f1a340",
-                       midpoint = 0,
-                       na.value = "#303030",
-                       guide = "colorbar") +
-  labs(fill="Higher \nOrder ")+
-  xlab("Mutation 1") +
-  ylab("Mutation 2") +
-  theme_classic()+
-  facet_grid(rows=vars(second),scales="free",space="free_y")+
-  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
-        axis.text=element_text(size=10,color="black"),
-        legend.text=element_text(size=7,hjust = 0.5, vjust = 0.5),
-        legend.title=element_text(size=10,hjust = 0.5, vjust = 1),
-        axis.title=element_text(size=13),
-        legend.position="right",
-        legend.key.size = unit(0.6, "lines"),
-        strip.text = element_text(size = 8),
-        strip.switch.pad.grid = unit(0.1,"cm"),
-        legend.spacing.x = unit(0, 'cm'))
-
-ggsave(paste0("figures/Figure2_heatmap_second_order_and_higher_orders_","CoV555",".png"), width = 4, height = 3.1, units = "in")
-
-###CB6
-epistasis.biochem.df2 <- subset(epistasis.biochem.df.all,Antibody=="CB6")
-ggplot() + 
-  geom_tile(data = subset(epistasis.biochem.df2,second =="Pairwise"),
-            mapping=aes(x=`Term 1`, y=`Term 2`, fill= `Coefficient.nb`)) +
-  scale_fill_gradient2(limits = c(-1.5,1.5),low = brewer.pal(8,"Set1")[2],
-                       mid = "white",
-                       high = brewer.pal(8,"Set1")[1],
-                       midpoint = 0,
-                       guide = "colorbar") + 
-  labs(fill="Second \nOrder ")+
-  new_scale_fill()+
-  geom_tile(data = subset(epistasis.biochem.df2,part %in% c("D")),
-            mapping=aes(`Term 1`, `Term 2`, fill= `Coefficient.nb`)) +
-  scale_fill_gradient2(limits = c(-2,2),low ="#998ec3",
-                       mid = "white",
-                       high = "#f1a340",
-                       midpoint = 0,
-                       na.value = "#303030",
-                       guide = "colorbar") +
-  labs(fill="Higher \nOrder ")+
-  xlab("Mutation 1") +
-  ylab("Mutation 2") +
-  theme_classic()+
-  facet_grid(rows=vars(second),scales="free",space="free_y")+
-  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
-        axis.text=element_text(size=10,color="black"),
-        legend.text=element_text(size=7,hjust = 0.5, vjust = 0.5),
-        legend.title=element_text(size=10,hjust = 0.5, vjust = 1),
-        axis.title=element_text(size=13),
-        legend.position="right",
-        legend.key.size = unit(0.6, "lines"),
-        strip.text = element_text(size = 8),
-        strip.switch.pad.grid = unit(0.1,"cm"),
-        legend.spacing.x = unit(0, 'cm'))
-
-ggsave(paste0("figures/Figure2_heatmap_second_order_and_higher_orders_","CB6",".png"), width = 4, height = 3.1, units = "in")
-
-###Plot FIGURE 2C-D###
-first.structure$Term <- as.factor(first.structure$Term)
-ggplot(first.structure, aes(`buriedSA`, `ACE2_Effect`, color= `Term`)) + 
-  geom_point(size = 5.5) +
-  scale_color_manual(values = getPalettePairedLong(15))+
-  xlab(expression(paste("Contact Surface Area (",ring(A),{}^2,")"))) +
-  ylab("Linear Effect") +
-  labs(color='Linear Effect') +
-  #geom_text_repel(data=subset(first.structure,buriedSA>0),
-  #          aes(buriedSA-3.5,ACE2_Effect+.1,label=Term),size=4,color="black")+
-  theme_classic()+
-  xlim(0,130)+
-  theme(axis.text.x = element_text(angle = 0),
-        axis.text=element_text(size=12,color="black"),
-        legend.position = "none",
-        axis.title=element_text(size=14))
-ggsave("figures/Figure2_scatter_plot_linear_effect_vs_surface_area_withoutlabel_edit0504.png", width = 3, height = 3, units = "in")
-
-ggplot(second.structure, aes(`distance`, `epistasis`, color= `epistasis`)) + 
-  geom_point(size = 5) +
-  scale_color_gradient2(limits = c(-.8,.8),low = brewer.pal(8,"Set1")[2],
-                       mid = "#dedede",
-                       high = brewer.pal(8,"Set1")[1],
-                       midpoint = 0) +
-  #geom_density(alpha=.2, fill="#FF6666") +
-  xlab("Distance (\uc5)") +
-  ylab("Pairwise Effect") +
-  labs(color='Pairwise Effect') +
-  #geom_text_repel(data=subset(second.structure,epistasis>0.3 | epistasis<(-0.15)),
-  #          aes(distance,epistasis,label=labels),size=3.5,color="black")+
-  theme_classic()+
-  theme(axis.text.x = element_text(angle = 0),
-        axis.text=element_text(size=12,color="black"),
-        legend.position = "none",
-        #legend.text=element_text(size=12),
-        #legend.title=element_blank(),
-        axis.title=element_text(size=14))
-ggsave("figures/Figure2_scatter_plot_pairwise_effect_vs_distance_withoutlabel_0504edit.png", width = 3, height = 3, units = "in")
-```
-
-```{r SI epistasis}
-
-###Plot FIGURE 2A###
-#just good ol linear effects
-ggplot(subset(epistasis.stat,Order=="1"), aes(x=`Term 1`, y=Coefficient, fill = `Term 1`))+
-  geom_bar(stat='identity',color="#333333")+
-  geom_errorbar(aes(ymin=Coefficient-Standard.Error, ymax=Coefficient+Standard.Error), width=.6,
-                position=position_dodge(.9), colour = "#969696",size=0.7) +
-  scale_fill_manual(values = getPalettePairedLong(15))+
-  xlab("Mutation") +
-  ylab("Effect") +
-  theme_classic()+
-  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
-        axis.text=element_text(size=12,color="black"),
-        legend.text=element_text(size=12),
-        legend.title=element_blank(),
-        axis.title=element_text(size=14),
-        legend.position = "none")
-
-ggsave("figures/FigureSI2_stat_bars_linear_effects_0504edit.png", width = 4.7, height = 2.8, units = "in")
-
-###Plot FIGURE 2B###
-#bunch of rearranging the terms and coefficients
-summing_coefficient <- function(x,y){
-  return(with(y, sum(Coefficient[
-    rowSums(x[1] == y,na.rm=TRUE) > 0  &
-      rowSums(x[2] == y,na.rm=TRUE) > 0])
-  ))
-}
-
-summing_coefficient <- function(x,y){
-  return(with(y, sum(Coefficient[
-    rowSums(x[1] == y,na.rm=TRUE) > 0  &
-      rowSums(x[2] == y,na.rm=TRUE) > 0])
-  ))
-}
-abs_summing_coefficient <- function(x,y){
-  return(with(y, sum(abs(Coefficient[
-    rowSums(x[1] == y,na.rm=TRUE) > 0  &
-      rowSums(x[2] == y,na.rm=TRUE) > 0]))
-  ))
-}
-
-summing_coefficient_to_one <- function(x,y){
-  return(with(y, sum(Coefficient[
-    rowSums(x[1] == y,na.rm=TRUE) > 0 ])
-  ))
-}
-epistasis.stat.higher <- subset(epistasis.stat,Order %in% c("3","4"))
-epistasis.stat.temp <- subset(epistasis.stat,Order=="2")
-epistasis.stat.temp$t1 <- epistasis.stat.temp$`Term 2`
-epistasis.stat.temp$t2 <- epistasis.stat.temp$`Term 1`
-epistasis.stat.temp$part <- "A"
-epistasis.stat.temp$second <- "2"
-
-
-epistasis.stat.temp2 <- epistasis.stat.temp
-epistasis.stat.temp2$`Term 1` <- epistasis.stat.temp2$t1
-epistasis.stat.temp2$`Term 2` <- epistasis.stat.temp2$t2
-#epistasis.stat.temp2$`Coefficient`<- apply(epistasis.stat.temp2,1,summing_coefficient,y=epistasis.stat.higher)
-epistasis.stat.temp2$part <- "B"
-epistasis.stat.temp2$second <- "2"
-
-epistasis.stat.temp3 <- subset(epistasis.stat,Order=="1")
-epistasis.stat.temp3$`Term 2` <- epistasis.stat.temp3$`Term 1`
-epistasis.stat.temp3$t1 <- NA
-epistasis.stat.temp3$t2 <- NA
-epistasis.stat.temp3$Coefficient <- NA
-epistasis.stat.temp3$part <- "C"
-epistasis.stat.temp3$second <- "2"
-
-epistasis.stat.temp4 <- subset(epistasis.stat,Order=="1")
-epistasis.stat.temp4$`Term 2` <- "Higher"
-epistasis.stat.temp4$t1 <- NA
-epistasis.stat.temp4$t2 <- NA
-epistasis.stat.temp4$Coefficient <- apply(epistasis.stat.temp4,1,summing_coefficient_to_one,y=epistasis.stat.higher)
-epistasis.stat.temp4$part <- "D"
-epistasis.stat.temp4$second <- ">2"
-
-epistasis.stat.df2 <- rbind(epistasis.stat.temp,epistasis.stat.temp2,epistasis.stat.temp3,epistasis.stat.temp4)
-epistasis.stat.df2$second <- factor(epistasis.stat.df2$second,levels=c("2",">2"))
-epistasis.stat.df2$`Term 2` <- factor(epistasis.stat.df2$`Term 2`,levels=c(nn.muts,"Higher"))
-
-ggplot() + 
-  geom_tile(data = subset(epistasis.stat.df2,second =="2"),
-            mapping=aes(x=`Term 1`, y=`Term 2`, fill= `Coefficient`)) +
-  scale_fill_gradient2(limits = c(-0.1,0.1),low = brewer.pal(8,"Set1")[2],
-                       mid = "white",
-                       high = brewer.pal(8,"Set1")[1],
-                       midpoint = 0,
-                       guide = "colorbar") + 
-  labs(fill="Second \nOrder ")+
-  new_scale_fill()+
-  geom_tile(data = subset(epistasis.stat.df2,part %in% c("D")),
-                          mapping=aes(`Term 1`, `Term 2`, fill= `Coefficient`)) +
-  scale_fill_gradient2(limits = c(-0.1,0.1),low ="#998ec3",
-                       mid = "white",
-                       high = "#f1a340",
-                       midpoint = 0,
-                       na.value = "#303030",
-                       guide = "colorbar") +
-  labs(fill="Higher \nOrder ")+
-  xlab("Mutation 1") +
-  ylab("Mutation 2") +
-  theme_classic()+
-  facet_grid(rows=vars(second),scales="free",space="free_y")+
-  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
-        axis.text=element_text(size=12,color="black"),
-        #legend.text=element_text(size=12),
-        legend.title=element_text(size=11,hjust = 1, vjust = 1),
-        axis.title=element_text(size=14),
-        legend.position="bottom",
-        legend.spacing.x = unit(0, 'cm'),
-        legend.text = element_text(size=8,hjust=0.6))
-
-ggsave("figures/FigureSI2_stat_heatmap_second_order_and_higher_orders_0506edit.png", width = 4.7, height = 5.3, units = "in")
-
-###Plot FIGURE 2C-D###
-first.structure$Term <- as.factor(first.structure$Term)
-ggplot(first.structure, aes(`buriedSA`, `ACE2_Effect`, color= `Term`)) + 
-  geom_point(size = 5.5) +
-  scale_color_manual(values = getPalettePairedLong(15))+
-  xlab(expression(paste("Contact Surface Area (",ring(A),{}^2,")"))) +
-  ylab("Linear Effect") +
-  labs(color='Linear Effect') +
-  #geom_text_repel(data=subset(first.structure,buriedSA>0),
-  #          aes(buriedSA-3.5,ACE2_Effect+.1,label=Term),size=4,color="black")+
-  theme_classic()+
-  xlim(0,130)+
-  theme(axis.text.x = element_text(angle = 0),
-        axis.text=element_text(size=12,color="black"),
-        legend.position = "none",
-        axis.title=element_text(size=14))
-ggsave("figures/FigureSI2_stat_scatter_plot_linear_effect_vs_surface_area_withoutlabel_edit0504.png", width = 3, height = 3, units = "in")
-
-ggplot(second.structure, aes(`distance`, `epistasis`, color= `epistasis`)) + 
-  geom_point(size = 5) +
-  scale_color_gradient2(limits = c(-.8,.8),low = brewer.pal(8,"Set1")[2],
-                       mid = "#dedede",
-                       high = brewer.pal(8,"Set1")[1],
-                       midpoint = 0) +
-  #geom_density(alpha=.2, fill="#FF6666") +
-  xlab("Distance (\uc5)") +
-  ylab("Pairwise Effect") +
-  labs(color='Pairwise Effect') +
-  #geom_text_repel(data=subset(second.structure,epistasis>0.3 | epistasis<(-0.15)),
-  #          aes(distance,epistasis,label=labels),size=3.5,color="black")+
-  theme_classic()+
-  theme(axis.text.x = element_text(angle = 0),
-        axis.text=element_text(size=12,color="black"),
-        legend.position = "none",
-        #legend.text=element_text(size=12),
-        #legend.title=element_blank(),
-        axis.title=element_text(size=14))
-ggsave("figures/FigureSI2_stat_scatter_plot_pairwise_effect_vs_distance_withoutlabel_0504edit.png", width = 3, height = 3, units = "in")
-```
-
-```{r epistasis regression exploration}
-
-require(ggplot2)
-require(GGally)
-require(VGAM)
-Kds_simplified[paste0('Mutation_', nn)] <- Kds_simplified[paste0('Mutation ', nn)]
-Kds_simplified[nn.muts] <- Kds_simplified[paste0('Mutation ', nn)]
-Kds.abs <- subset(Kds_simplified,Antibody=="CoV555")
-Kds.abs.CoV555 <- subset(Kds_simplified,Antibody=="CoV555")
-Kds.abs.S309 <- subset(Kds_simplified,Antibody=="S309")
-Kds.abs.CB6 <- subset(Kds_simplified,Antibody=="CB6")
-Kds.abs.REGN10987 <- subset(Kds_simplified,Antibody=="REGN10987")
-
-
-Kds.abs.genos.phenos <- Kds.abs[,c(2,21:35)]
-fmla <- as.formula(paste("Log10Kd ~ ", paste(paste0('Mutation_', nn),collapse= "+")))
-linear.comb <- paste(paste0('Mutation_', nn),collapse= "+")
-fmla.2 <- as.formula(paste0("Log10Kd ~ (",linear.comb,")^2"))
-fmla.4 <- as.formula(paste0("Log10Kd ~ (",linear.comb,")^4"))
-m2 <- vglm(fmla.2, tobit(Lower = 6, imethod = 2), data = Kds.abs)
-m2.old <- glm(fmla.2,  data = Kds.abs)
-m2.coefs <- as.vector(coef(m2))
-m2.old.coefs <- as.vector(coef(m2.old))
-m2.old.coefs <- c(m2.old.coefs[1],NA,m2.old.coefs[2:length(m2.old.coefs)])
-combo <- t(combn(nn.muts,2))
-Second.Coefficient.comparison <- data.frame(Terms1 = c("Intercept.1","Intercept.2",nn.muts,combo[,1]),
-                                            Terms2 = c(rep(NA,17),combo[,2]),
-                                            Regular = m2.old.coefs,
-                                            Tobit = m2.coefs,
-                                            Order = c(rep("None",2),rep(1,15),rep(2,105)))
-Second.Coefficient.comparison.muts.only <- Second.Coefficient.comparison[-(1:2),]
-Second.Coefficient.comparison.muts.only$Terms1 <- factor(Second.Coefficient.comparison.muts.only$Terms1,levels=nn.muts)
-Second.Coefficient.comparison.muts.only$Terms2 <- factor(Second.Coefficient.comparison.muts.only$Terms2,levels=nn.muts)
-Second.Coefficient.comparison.muts.only.1 <- subset(Second.Coefficient.comparison.muts.only,Order == 1)
-Second.Coefficient.comparison.muts.only.1.long <- reshape(Second.Coefficient.comparison.muts.only.1, 
-                                                 varying=c("Tobit", "Regular"),
-                                                 direction="long", 
-                                                 idvar=c("Terms1"),
-                                                 v.names="Coefficient",
-                                                 timevar = "Method")
-Second.Coefficient.comparison.muts.only.1.long$Method <- as.factor(Second.Coefficient.comparison.muts.only.1.long$Method)
-levels(Second.Coefficient.comparison.muts.only.1.long$Method) <- c("Tobit","Regular")
-
-####ANOTHER MODEL
-#m4 <- vglm(fmla.4, tobit(Lower = 6, imethod = 2), data = Kds.abs)
-#m4.old <- glm(fmla.4,  data = Kds.abs)
-#summary(m <- vglm(fmla, tobit(Lower = 6), data = Kds.abs))
-#m.old <- glm(fmla,data=Kds.abs)
-#m.coefs <- as.vector(coef(m))[-2]
-#m.old.coefs <- as.vector(coef(m.old))
-Coefficient.comparison <- data.frame(Terms = c("Intercept",nn.muts),
-                                     Regular = m.old.coefs,
-                                     Tobit = m.coefs)
-Coefficient.comparison.muts.only <- Coefficient.comparison[-1,]
-Coefficient.comparison.muts.only$Terms <- factor(Coefficient.comparison.muts.only$Terms,levels=nn.muts)
-Coefficient.comparison.muts.only.long <- reshape(Coefficient.comparison.muts.only, 
-                                                 varying=c("Tobit", "Regular"),
-                                                 direction="long", 
-                                                 idvar=c("Terms"),
-                                                 v.names="Coefficient",
-                                                 timevar = "Method")
-Coefficient.comparison.muts.only.long$Method <- as.factor(Coefficient.comparison.muts.only.long$Method)
-levels(Coefficient.comparison.muts.only.long$Method) <- c("Tobit","Regular")
-####
-
-ggplot(Second.Coefficient.comparison.muts.only.1, aes(Regular, Tobit, color=Terms1)) + 
-  geom_point(size = 5) +
-  scale_color_manual(values=getPalettePairedLong(15))+
-  #geom_density(alpha=.2, fill="#FF6666") +
-  xlab("OLS Coeffficnet") +
-  ylab("Tobit Coefficient") +
-  #labs(color='Pairwise Effect') +
-  #geom_text_repel(data=subset(second.structure,epistasis>0.3 | epistasis<(-0.15)),
-  #          aes(distance,epistasis,label=labels),size=3.5,color="black")+
-  theme_classic()+
-  geom_abline()+
-  theme(axis.text.x = element_text(angle = 0),
-        axis.text=element_text(size=12,color="black"),
-        legend.position = "none",
-        #legend.text=element_text(size=12),
-        #legend.title=element_blank(),
-        axis.title=element_text(size=14))
-ggsave("figures/FigureSI_tobit_ols_comparison_smaller_pairwise_CoV555.png", width = 4, height = 4, units = "in")
-
-
-ggplot(Coefficient.comparison.muts.only.long, aes(x=Terms, y=Coefficient, fill = Method))+
-  geom_bar(stat='identity',color="#333333",position = position_dodge())+
-  #geom_errorbar(aes(ymin=Coefficient-Standard.Error, ymax=Coefficient+Standard.Error), width=.6,
-  #              position=position_dodge(.9), colour = "#969696",size=0.7) +
-  scale_fill_manual(values = antibody.colors)+
-  #geom_hline(yintercept=50,size=0.5,linetype = "dashed",color="black")+
-  xlab("Mutation") +
-  ylab(str_wrap("Coefficient", width = 30)) +
-  theme_classic()+
-  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
-        axis.text=element_text(size=12,color="black"),
-        legend.text=element_text(size=12),
-        legend.title=element_blank(),
-        axis.title=element_text(size=14),
-        axis.title.y=element_text(size=12))
-
-ggsave("figures/FigureSI_linear_coefs_tobit_regular.png", width = 10, height = 5, units = "in")
-
-###Pairwise
-Second.Coefficient.pairwise <- Second.Coefficient.comparison.muts.only
-Second.Coefficient.pairwise[1:15,]$Terms2 <- nn.muts
-Second.Coefficient.pairwise$Regular <- ifelse(Second.Coefficient.pairwise$Terms1==Second.Coefficient.pairwise$Terms2,
-                                              NA,
-                                              Second.Coefficient.pairwise$Regular)
-Second.Coefficient.pairwise$Tobit <- ifelse(Second.Coefficient.pairwise$Terms1==Second.Coefficient.pairwise$Terms2,
-                                              NA,
-                                              Second.Coefficient.pairwise$Tobit)
-temp <- subset(Second.Coefficient.pairwise,Order==2)
-t <- temp$Terms1
-temp$Terms1 <- temp$Terms2
-temp$Terms2 <- t
-Second.Coefficient.pairwise <- rbind(Second.Coefficient.pairwise,temp)
-Second.Coefficient.pairwise$Terms1 <- factor(Second.Coefficient.pairwise$Terms1,levels=nn.muts)
-Second.Coefficient.pairwise$Terms2 <- factor(Second.Coefficient.pairwise$Terms2,levels=nn.muts)
-ggplot() + 
-  geom_tile(data = Second.Coefficient.pairwise,
-            mapping=aes(x=`Terms1`, y=`Terms2`, fill= `Tobit`)) +
-  scale_fill_gradient2(limits = c(-3.1,2.4),low = brewer.pal(8,"Set1")[2],
-                       mid = "white",
-                       high = brewer.pal(8,"Set1")[1],
-                       midpoint = 0,
-                       guide = "colorbar") + 
-  labs(fill="Second \nOrder ")+
-  xlab("Mutation 1") +
-  ylab("Mutation 2") +
-  theme_classic()+
-  #facet_grid(rows=vars(second),scales="free",space="free_y")+
-  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
-        axis.text=element_text(size=12,color="black"),
-        #legend.text=element_text(size=12),
-        legend.title=element_text(size=11,hjust = 1, vjust = 1),
-        axis.title=element_text(size=14),
-        legend.position="bottom",
-        legend.spacing.x = unit(0, 'cm'),
-        legend.text = element_text(size=8,hjust=0.6))
-
-ggsave("figures/FigureSI2_stat_heatmap_second_order_tobit_CoV555.png", width = 4.7, height = 5.3, units = "in")
-```
-
-```{r more epistais predictions}
-
-ggplot(Kds.abs, aes(Log10Kd, Predicted.Tobit.Latent, color=Mutation_417)) + 
-  geom_point(size = 1) +
-  #geom_density(alpha=.2, fill="#FF6666") +
-  xlab("Actual -LogKd") +
-  ylab("Predicted -LogKd") +
-  #labs(color='Pairwise Effect') +
-  #geom_text_repel(data=subset(second.structure,epistasis>0.3 | epistasis<(-0.15)),
-  #          aes(distance,epistasis,label=labels),size=3.5,color="black")+
-  theme_classic()+
+  lim.higher.low <- ifelse(i=="CoV555",-6.5,ifelse(i=="REGN10987",-1,-1))
+  lim.higher.high <- ifelse(i=="CoV555",1,ifelse(i=="REGN10987",1,1))
   
-  ylim(-1,10.8)+
-  geom_abline()+
+  lim.2.low <- ifelse(i=="CoV555",-1,ifelse(i=="REGN10987",-4,-1))
+  lim.2.high <- ifelse(i=="CoV555",1.5,ifelse(i=="CB6",1,1))
+  
+  ggplot() + 
+    geom_tile(data = subset(epistasis.biochem.df2,second =="Pairwise"),
+              mapping=aes(x=`Term 1`, y=`Term 2`, fill= `Coefficient.nb`)) +
+    scale_fill_gradient2(limits = c(lim.2.low,lim.2.high),low = brewer.pal(8,"Set1")[2],
+                         mid = "white",
+                         high = brewer.pal(8,"Set1")[1],
+                         midpoint = 0,
+                         guide = "colorbar") +
+    
+    labs(fill="Second \nOrder ")+
+    new_scale_fill()+
+    geom_tile(data = subset(epistasis.biochem.df2,part %in% c("D")),
+              mapping=aes(`Term 1`, `Term 2`, fill= `Coefficient.nb`)) +
+    scale_fill_gradient2(limits= c(lim.higher.low,lim.higher.high),
+                         low ="#998ec3",
+                         mid = "white",
+                         high = "#f1a340",
+                         midpoint = 0,
+                         na.value = "#303030",
+                         guide = "colorbar") +
+    labs(fill="Higher \nOrder ")+
+    xlab("Mutation 1") +
+    ylab("Mutation 2") +
+    theme_classic()+
+    facet_grid(rows=vars(second),scales="free",space="free_y")+
+    #facet_grid(second~Antibody,scales="free",space="free_y")+
+    
+    #facet_wrap( ~ Antibody, ncol = 2)+
+    
+    theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
+          axis.text=element_text(size=9.5,color="black"),
+          legend.text=element_text(size=7,hjust = 0.5, vjust = 0.5,angle=0),
+          legend.title=element_text(size=10,hjust = 0.5, vjust = 1),
+          axis.title=element_text(size=13),
+          legend.position="right",
+          legend.key.size = unit(0.6, "lines"),
+          strip.text = element_text(size = 8),
+          strip.switch.pad.grid = unit(0.1,"cm"),
+          legend.spacing.x = unit(0, 'cm'))
+  ggsave(paste0("figures/Figure2_",i,"_epistasis_terms.png"), width = 4, height = 3.2, units = "in")
+  ggsave(paste0("figures/THOMAS_IGNORE_Figure2_",i,"_epistasis_terms.png"), width = 4, height = 3.2, units = "in")
+}
+```
+
+Figure 3B; Epistasis model predictions
+```{r epistasis predictions}
+Kds_simplified$Log10Kd.epi <- ifelse(Kds_simplified$Log10Kd.nb < 6 | is.na(Kds_simplified$Log10Kd.nb),5,
+                                     Kds_simplified$Log10Kd.nb)
+#antibody.considered <- "CoV555"
+#Kds_simplified.justone <- subset(Kds_simplified,Antibody==antibody.considered)
+
+for(i in c(antibodies,"ACE2")){
+  one.prediction <- read.table(file = paste0('data_lasso/lasso_prediction_',i,'_aic_opt_order_biochem.txt'),
+                               sep = '\t', 
+                               header = TRUE,
+                               col.names = c("Genotype","Measured","Predicted.Kd","Predicted.Kd.Linear"),
+                               colClasses=c("character","numeric","numeric","numeric"))
+  one.prediction$Antibody <- i
+  assign(paste0("one.prediction.", i),one.prediction)
+}
+one.prediction.all <- rbind(one.prediction.CB6,one.prediction.CoV555,one.prediction.REGN10987,one.prediction.S309,one.prediction.ACE2)
+one.prediction.all$Antibody <- factor(one.prediction.all$Antibody, levels=c(antibodies,"ACE2"))
+Kds_simplified$Predicted <-  one.prediction.all$Predicted.Kd[
+  match(interaction(Kds_simplified$Genotype,Kds_simplified$Antibody),
+        interaction(one.prediction.all$Genotype,one.prediction.all$Antibody))]
+
+Kds_simplified$Predicted.epi <- ifelse(Kds_simplified$Predicted < 6,
+                                       5,
+                                       Kds_simplified$Predicted)
+#cor(S309.prediction$Measured,S309.prediction$Predicted,use = "na.or.complete")^2
+#corr <- cor(Kds_simplified.justone$Log10Kd.epi,Kds_simplified.justone$Predicted.epi,use = "na.or.complete")^2
+Kds_simplified$grouping <- case_when(
+  (Kds_simplified$Antibody== "CB6" & 
+     Kds_simplified$`Mutation 417` == "0") ~ "K417",
+  (Kds_simplified$Antibody== "CB6" & 
+     Kds_simplified$`Mutation 417` == "1") ~ "N417",
+  
+  (Kds_simplified$Antibody== "CoV555" & 
+     Kds_simplified$`Mutation 493` == "0"&
+     Kds_simplified$`Mutation 484` == "0") ~ "Q493/E484",
+  (Kds_simplified$Antibody== "CoV555" & 
+     Kds_simplified$`Mutation 493` == "1"&
+     Kds_simplified$`Mutation 484` == "1") ~ "R493/A484",
+  (Kds_simplified$Antibody== "CoV555" & 
+     Kds_simplified$`Mutation 493` == "1" &
+     Kds_simplified$`Mutation 484` == "0") ~ "R493/E484",
+  (Kds_simplified$Antibody== "CoV555" & 
+     Kds_simplified$`Mutation 493` == "0" &
+     Kds_simplified$`Mutation 484` == "1") ~ "Q493/A484",
+  
+  (Kds_simplified$Antibody== "REGN10987" & 
+     Kds_simplified$`Mutation 440` == "0"&
+     Kds_simplified$`Mutation 446` == "0") ~ "N440/G446",
+  (Kds_simplified$Antibody== "REGN10987" & 
+     Kds_simplified$`Mutation 440` == "1"&
+     Kds_simplified$`Mutation 446` == "1") ~ "K440/S446",
+  (Kds_simplified$Antibody== "REGN10987" & 
+     Kds_simplified$`Mutation 440` == "1" &
+     Kds_simplified$`Mutation 446` == "0") ~ "K440/G446",
+  (Kds_simplified$Antibody== "REGN10987" & 
+     Kds_simplified$`Mutation 440` == "0" &
+     Kds_simplified$`Mutation 446` == "1") ~ "N440/S446",
+  
+  (Kds_simplified$Antibody== "S309") ~ "All S309",
+  (Kds_simplified$Antibody== "ACE2") ~ "All ACE2"
+  
+)
+
+Kds_simplified$grouping <- factor(Kds_simplified$grouping,levels=c("K417","N417",
+                                                                   "Q493/E484","R493/E484","Q493/A484","R493/A484",
+                                                                   "N440/G446","K440/G446","N440/S446","K440/S446",
+                                                                   "All S309", "All ACE2"))
+Kds_simplified$Antibody <- factor(Kds_simplified$Antibody,levels=c(antibodies,"ACE2"))
+
+Kds_simplified$Accuracy <- ifelse((Kds_simplified$Log10Kd.epi <= 6 & Kds_simplified$Predicted.epi <= 6)|
+                                    (Kds_simplified$Log10Kd.epi > 6 & Kds_simplified$Predicted.epi > 6),TRUE,FALSE )
+Kds_prediction_plot <- subset(Kds_simplified,Filtered | Log10Kd.epi < 6.001)
+Kds_prediction_plot$grouping <- factor(Kds_prediction_plot$grouping,levels=c("K417","N417",
+                                                                             "Q493/E484","R493/E484","Q493/A484","R493/A484",
+                                                                             "N440/G446","K440/G446","N440/S446","K440/S446",
+                                                                             "All S309","All ACE2"))
+CB6.Accuracy <- mean(subset(Kds_prediction_plot,Antibody=="CB6")$Accuracy)
+REGN10987.Accuracy <- mean(subset(Kds_prediction_plot,Antibody=="REGN10987")$Accuracy)
+S309.Accuracy <- mean(subset(Kds_prediction_plot,Antibody=="S309")$Accuracy)
+CoV555.Accuracy <- mean(subset(Kds_prediction_plot,Antibody=="CoV555")$Accuracy)
+ACE2.Accuracy <- mean(na.omit(subset(Kds_prediction_plot,Antibody=="ACE2"))$Accuracy)
+
+Kds_prediction_plot2 <- subset(Kds_prediction_plot,Predicted.epi > 6 & Log10Kd.epi > 6)
+
+CB6.r <- cor(subset(Kds_prediction_plot2,Antibody=="CB6" )$Predicted.epi,
+             subset(Kds_prediction_plot2,Antibody=="CB6")$Log10Kd.epi)^2
+CoV555.r <- cor(subset(Kds_prediction_plot2,Antibody=="CoV555")$Predicted.epi,
+                subset(Kds_prediction_plot2,Antibody=="CoV555")$Log10Kd.epi)^2
+REGN10987.r <- cor(subset(Kds_prediction_plot2,Antibody=="REGN10987")$Predicted.epi,
+                   subset(Kds_prediction_plot2,Antibody=="REGN10987")$Log10Kd.epi)^2
+S309.r <- cor(subset(Kds_prediction_plot2,Antibody=="S309")$Predicted.epi,
+              subset(Kds_prediction_plot2,Antibody=="S309")$Log10Kd.epi)^2
+ACE2.r <- cor(subset(Kds_prediction_plot2,Antibody=="ACE2")$Predicted.epi,
+              subset(Kds_prediction_plot2,Antibody=="ACE2")$Log10Kd.epi)^2
+
+legends <- data.frame(Antibody.used = factor(c("LY-CoV016 (4th)","LY-CoV555 (3rd)","REGN10987 (2nd)","S309 (4th)","ACE2 (5th)"),
+                                        levels=c("LY-CoV016 (4th)","LY-CoV555 (3rd)","REGN10987 (2nd)","S309 (4th)","ACE2 (5th)")),
+                      R2 = c(CB6.r,CoV555.r,REGN10987.r,S309.r,ACE2.r),
+                      Acc = c(CB6.Accuracy,CoV555.Accuracy,REGN10987.Accuracy,S309.Accuracy,ACE2.Accuracy))
+
+Kds_prediction_plot$Antibody.used <- ifelse(Kds_prediction_plot$Antibody=="CB6","LY-CoV016 (4th)",
+                                             ifelse(Kds_prediction_plot$Antibody=="CoV555","LY-CoV555 (3rd)",
+                                                    ifelse(Kds_prediction_plot$Antibody=="REGN10987","REGN10987 (2nd)",
+                                                           ifelse(Kds_prediction_plot$Antibody=="S309","S309 (4th)",
+                                                                  ifelse(Kds_prediction_plot$Antibody=="ACE2","ACE2 (5th)",NA
+                                                           )))))
+
+Kds_prediction_plot$Antibody.used<-factor(Kds_prediction_plot$Antibody.used,
+                                           levels = c("LY-CoV016 (4th)","LY-CoV555 (3rd)","REGN10987 (2nd)","S309 (4th)","ACE2 (5th)")
+)
+
+ggplot(Kds_prediction_plot, 
+       aes(Log10Kd.epi, Predicted.epi)) + 
+  facet_wrap( ~ Antibody.used, ncol = 3)+
+  geom_jitter(size = 0.5,alpha=0.7,aes(color=grouping)) +
+  #scale_color_manual(values=getPalettePairedLong(6)[2:5]) +
+  scale_color_manual(values=getPalettePairedLong(13)[2:13]) +
+  labs(x=expression(paste("Measured ",(-log~italic(K)[paste("D", ",", "app")]))),
+       y=expression(paste("Predicted ",(-log~italic(K)[paste("D", ",", "app")])))) +
+  labs(color='Mutation') +
+  geom_abline(color="black",linetype="dashed")+
+  scale_y_continuous(breaks=c(5,6:11),labels=c("N",6:11))+
+  scale_x_continuous(breaks=c(5,6:11),labels=c("N",6:11))+
+  #geom_text_repel(data=subset(second.structure,epistasis>0.3 | epistasis<(-0.15)),
+  #          aes(distance,epistasis,label=labels),size=3.5,color="black")+
+  #guides(color=guide_legend(ncol=2))+
+  
+  #geom_text_repel(data=subset(second.structure,epistasis>0.3 | epistasis<(-0.15)),
+  #          aes(distance,epistasis,label=labels),size=3.5,color="black")+
+  theme_classic()+
+  geom_richtext(data = legends,
+                mapping = aes(x = 5.2, y = 9.8, label = paste0("R<sup>2</sup> = ", round(R2,2),"<br>Acc = ",round(Acc,2))),
+                hjust=0,
+                size=3.5,
+                #label.padding=unit(c(0,0,0,0),"lines"),
+                fill = NA,
+                label.color = NA)+
+  guides(colour = guide_legend(override.aes = list(size=3),ncol=6))+
   theme(axis.text.x = element_text(angle = 0),
         axis.text=element_text(size=12,color="black"),
         legend.position = "none",
-        #legend.text=element_text(size=12),
-        #legend.title=element_blank(),
-        axis.title=element_text(size=14))
-ggsave("figures/FigureSI_regular_tobit_predicted_vs_actual.png", width = 4, height = 4, units = "in")
+        legend.text=element_text(size=10),
+        legend.title=element_blank(),
+        legend.key.size = unit(0.5, "lines"),
+        axis.title.x=element_text(size=13),
+        axis.title.y=element_text(size=12.7),
+        legend.spacing = unit(4, "pt"), 
+        legend.key.height = unit(8, "pt"), 
+        legend.spacing.x = unit(4, "pt"), 
+        legend.key.width  = unit(4, "pt"), 
+        legend.margin=margin(4,4,4,4))
+ggsave("figures/Figure3_prediction_by_epistasis_legend_two_optimal_order.png", width = 5.2, height = 3.5, units = "in")
+
 
 ```
 ## Figure 4 - Comparison with ACE2 Data
-###Trade-offs
+Figure 4C: Phenotypicradeoffs
 ```{r tradeoffs}
-library(Rtsne)
-library(plotly)
 Kds.short.tradeoff[paste0("Mutation_",nn)] <- Kds_simplified[1:32768,paste0("Mutation ",nn)]
 Kds.short.tradeoff$Mean_Ab <- rowMeans(Kds.short.tradeoff[,3:6])
 Kds.short.tradeoff$Mean_Ab <- rowMeans(Kds.short.tradeoff[,3:6])
@@ -1702,7 +1440,6 @@ for(i in 1:4){
     }
   }
 }
-
 
 for(i in 1:4){
   for(j in 5:5){
@@ -1954,211 +1691,218 @@ ggsave(paste0("figures/FigureSI_dot_plots_tradeoff_legend.png"),
        width = 8.8, height = 4, units = "in")
 
 ```
+Figure 4A-B: ACE2 effects
+```{r}
+Kds.short.tradeoff$Classes.escapes <-  0
 
-```{r max abs}
-library(ggtext)
-ggplot(Kds.short.tradeoff,aes(x=ACE2,y=Max_Ab))+
-#ggplot(subset(Kds.short.tradeoff,Mutation_501=="0"&Mutation_498=="0"),aes(x=ACE2,y=Max_Ab,color=Max_Ab_which))+
-  #geom_line(aes(color= `Mutation`),size=1.25,alpha=0.8)+
-  geom_point(size = 0.5 ,alpha=0.5,aes(color=Max_Ab_which)) +
+Kds.short.tradeoff$`Antibodies Escaped` <- (Kds.short.tradeoff$CB6<=6.00) + 
+  (Kds.short.tradeoff$CoV555<=6.00) +
+  (Kds.short.tradeoff$REGN10987<=6.000)
+Kds.short.tradeoff$`Antibodies Escaped` <- factor(Kds.short.tradeoff$`Antibodies Escaped`,levels=0:3)
+
+compensatory.class <- function(genox){
+  ifelse(substr(genox,13,14)=="11",return("with"),
+         ifelse(substr(genox,13,14)=="00",return("without"),
+                ifelse(substr(genox,13,14)=="10",return(NA),
+                       ifelse(substr(genox,13,14)=="01",return(NA),NA))))
+  #return((substr(genox,13,14)=="11"))
+}
+
+Kds.short.tradeoff$`Compensatory Mutations` <-  sapply(Kds.short.tradeoff$Genotype,compensatory.class)
+#Kds.short.tradeoff$`Compensatory Mutations` <- ifelse(Kds.short.tradeoff$`Compensatory Mutations`,'Present','Absent')
+Kds.short.tradeoff$`Compensatory Mutations` <- factor(Kds.short.tradeoff$`Compensatory Mutations`,
+                                                      levels=c('without','with'))
+
+Kds.short.tradeoff$Class <- str_count(Kds.short.tradeoff$Genotype,"1") #initialize variable "Class", which is #hamming distance from Wuhan
+Kds.short.tradeoff$Class <- factor(Kds.short.tradeoff$Class,levels=0:15)
+
+ggplot(na.omit(Kds.short.tradeoff),aes(x=Class,y=ACE2,fill =`Antibodies Escaped`,color=`Compensatory Mutations`))+
+  #geom_jitter(size=1.25,alpha=0.8)+
+  geom_boxplot(size=0.4,outlier.size = 0.4)+
+  #geom_line(aes(color=Classes.escapes,linetype=compensatory),size = 1 ,alpha=0.5) +
   #geom_errorbar(aes(ymin=`KD Effect`-STE, ymax=`KD Effect`+STE),color="black",width=0.0003,
   #              colour = "#969696",size=0.5,alpha=0.5)+
-  scale_color_manual(values=getPalettePairedLong(6)[2:5]) +
-  geom_smooth(method='lm',color="black")+
-  geom_richtext(data = legends,
-                mapping = aes(x = 6.1, 
-                              y = 10.6, 
-                              label = paste0("R<sup>2</sup> = ",round(corr1,2))
-                              ),
-                hjust=0,
-                size=3.5,
-                #label.padding=unit(c(0,0,0,0),"lines"),
-                fill = NA,
-                label.color = NA)+
-  #scale_color_manual(values = getPalettePairedLong(15))+
-  labs(x=expression(paste("ACE2 ",(-log~italic(K)[paste("D", ",", "app")]))),
-       y=expression(paste("Max mAb ",(-log~italic(K)[paste("D", ",", "app")]))),
-       color = "Antibody") +
-  #geom_text_repel(data=subset(first.structure,buriedSA>0),
-  #          aes(buriedSA-3.5,ACE2_Effect+.1,label=Term),size=4,color="black")+
-  theme_classic()+
-  xlim(6,10.5)+
-  #xlim(0,130)+
-  #geom_hline(yintercept = 0 , colour = "black", linetype = "dashed")+
-  guides(colour = guide_legend(override.aes = list(size=3)))+
-  theme(
-        axis.text=element_text(size=12,color="black"),
-        axis.text.x = element_text(size=14,angle = 0),
-        axis.text.y = element_text(size=12),
-        legend.position = "right",
-        legend.text=element_text(size=10),
-        #legend.title=element_blank(),
-        legend.key.size = unit(0.5, "lines"),
-        axis.title=element_text(size=14),
-        legend.spacing = unit(4, "pt"), 
-        legend.key.height = unit(8, "pt"), 
-        legend.spacing.x = unit(4, "pt"), 
-        legend.key.width  = unit(4, "pt"), 
-        legend.margin=margin(4,4,4,4),
-        legend.title = element_text(size=11))
-ggsave("figures/FigureSI_dot_plots_tradepff_max_edit0729.png", width = 4.2, height = 2.7, units = "in")
-#ggsave("figures/FigureSI_dot_plots_tradepff_max_without498_501.png", width = 3.3, height = 2.7, units = "in")
-
-#without compen
-ggplot(subset(Kds.short.tradeoff,Mutation_501=="0"&Mutation_498=="0"),aes(x=ACE2,y=Max_Ab))+
-  #geom_line(aes(color= `Mutation`),size=1.25,alpha=0.8)+
-  geom_point(size = 0.5 ,alpha=0.5,aes(color=Max_Ab_which)) +
-  #geom_errorbar(aes(ymin=`KD Effect`-STE, ymax=`KD Effect`+STE),color="black",width=0.0003,
-  #              colour = "#969696",size=0.5,alpha=0.5)+
-  scale_color_manual(values=getPalettePairedLong(6)[2:5]) +
-  geom_smooth(method='lm',color="black")+
-  geom_richtext(data = legends,
-                mapping = aes(x = 6.1, 
-                              y = 10.6, 
-                              label = paste0("R<sup>2</sup> = ",round(corr2,2))
-                              ),
-                hjust=0,
-                size=3.5,
-                #label.padding=unit(c(0,0,0,0),"lines"),
-                fill = NA,
-                label.color = NA)+
-  #scale_color_manual(values = getPalettePairedLong(15))+
-  labs(x=expression(paste("ACE2 ",(-log~italic(K)[paste("D", ",", "app")]))),
-       y=expression(paste("Max mAb ",(-log~italic(K)[paste("D", ",", "app")]))),
-       color = "Antibody") +
-  #geom_text_repel(data=subset(first.structure,buriedSA>0),
-  #          aes(buriedSA-3.5,ACE2_Effect+.1,label=Term),size=4,color="black")+
-  theme_classic()+
-  xlim(6,9.5)+
-  #xlim(0,130)+
-  #geom_hline(yintercept = 0 , colour = "black", linetype = "dashed")+
-  guides(colour = guide_legend(override.aes = list(size=3)))+
-  theme(
-        axis.text=element_text(size=10,color="black"),
-        axis.text.x = element_text(size=12,angle = 0),
-        axis.text.y = element_text(size=12),
-        legend.position = "none",
-        axis.title=element_text(size=14))
-ggsave("figures/FigureSI_dot_plots_tradepff_max_without498_501.png", width = 2.4, height = 2.7, units = "in")
-
-
-Kds.tradeoff.just.phenos <- Kds.short.tradeoff[,3:6]
-Kds.tradeoff.just.phenos$ACE2 <- ifelse(is.na(Kds.tradeoff.just.phenos$ACE2),6.0,Kds.tradeoff.just.phenos$ACE2)
-set.seed(142)
-
-tsne.data <- Rtsne(Kds.tradeoff.just.phenos)
-Kds.short.tradeoff$tSNE1 <- tsne.data$Y[,1]
-Kds.short.tradeoff$tSNE2 <- tsne.data$Y[,2]
-Kds.short.tradeoff$ACE2 <- ifelse(is.na(Kds.short.tradeoff$ACE2),7.0,Kds.short.tradeoff$ACE2)
-
-
-ggplot(Kds.short.tradeoff,aes(x=CB6,y=ACE2))+
-  #geom_line(aes(color= `Mutation`),size=1.25,alpha=0.8)+
-  geom_point(size = 1 ,alpha=0.5) +
-  #geom_errorbar(aes(ymin=`KD Effect`-STE, ymax=`KD Effect`+STE),color="black",width=0.0003,
-  #              colour = "#969696",size=0.5,alpha=0.5)+
-  #scale_color_manual(values = getPalettePairedLong(15))+
-  labs(x="S309",
-       y="ACE2") +
+  scale_fill_manual(values = getYellowtoRed(4)[1:4])+
+  scale_color_manual(values = c("gray80","gray10"))+
+  labs(y=expression(paste("ACE2 ",(-log~italic(K)[paste("D", ",", "app")]))),
+       x="Number of Mutations",
+       color = "Compensatory\nMutations",
+       fill = "Number of mAbs\nEscaped") +
   #geom_text_repel(data=subset(first.structure,buriedSA>0),
   #          aes(buriedSA-3.5,ACE2_Effect+.1,label=Term),size=4,color="black")+
   theme_classic()+
   #xlim(0,130)+
-  #geom_hline(yintercept = 0 , colour = "black", linetype = "dashed")+
-  guides(color=guide_legend(ncol=2))+
+  geom_hline(yintercept = 9.033694 , colour = "gray50", linetype = "dashed")+
+  #guides(color=guide_legend(ncol=2))+
   theme(
-        axis.text=element_text(size=10,color="black"),
-        axis.text.x = element_text(size=12,angle = 0),
-        axis.text.y = element_text(size=12),
-        legend.position = "none",
-        axis.title=element_text(size=14),
-        legend.text = element_text(size=10),
-        legend.title = element_text(size=11))
+    axis.text=element_text(size=10,color="black"),
+    axis.text.x = element_text(size=12,angle = 0),
+    axis.text.y = element_text(size=12),
+    legend.position = "right",
+    axis.title=element_text(size=14),
+    legend.text = element_text(size=10),
+    legend.title = element_text(size=11))
+ggsave("figures/FigureSI4_ACE2_across_numb_mutations_with_comp.png", width = 7.5, height = 3, units = "in")
 
-###compared to ACE2
-ggplot(Kds.short.tradeoff,aes(x=tSNE1,y=tSNE2,color=ACE2))+
-  #geom_line(aes(color= `Mutation`),size=1.25,alpha=0.8)+
-  geom_point(size = 0.5 ,alpha=0.5) +
+ggplot(na.omit(Kds.short.tradeoff),aes(x=Class,y=ACE2,fill =`Antibodies Escaped`))+
+  #geom_jitter(size=1.25,alpha=0.8)+
+  geom_boxplot(size=0.4,outlier.size = 0.4)+
+  #geom_line(aes(color=Classes.escapes,linetype=compensatory),size = 1 ,alpha=0.5) +
   #geom_errorbar(aes(ymin=`KD Effect`-STE, ymax=`KD Effect`+STE),color="black",width=0.0003,
   #              colour = "#969696",size=0.5,alpha=0.5)+
-  #scale_color_gradient2(limits = c(6.7,10.1),low = brewer.pal(8,"Set1")[2],
-  #                     mid = "#dedede",
-  #                     high = brewer.pal(8,"Set1")[1],
-  #                     midpoint = 8.6)+
-  labs(x="ACE2",
-       y="tSNE-2",
-       color="Affinity\nto ACE2") +
+  scale_fill_manual(values = getYellowtoRed(4)[1:4])+
+  #scale_color_manual(values = c("gray80","gray10"))+
+  labs(y=expression(paste("ACE2 ",(-log~italic(K)[paste("D", ",", "app")]))),
+       x="Number of Mutations",
+       color = "Compensatory\nMutations",
+       fill = "Number of mAbs\nEscaped") +
   #geom_text_repel(data=subset(first.structure,buriedSA>0),
   #          aes(buriedSA-3.5,ACE2_Effect+.1,label=Term),size=4,color="black")+
   theme_classic()+
   #xlim(0,130)+
-  #geom_hline(yintercept = 0 , colour = "black", linetype = "dashed")+
+  geom_hline(yintercept = 9.033694 , colour = "gray50", linetype = "dashed")+
+  #guides(color=guide_legend(ncol=2))+
   theme(
-        axis.text=element_text(size=10,color="black"),
-        axis.text.x = element_text(size=11,angle = 0),
-        axis.text.y = element_text(size=11),
-        legend.position = "bottom",
-        axis.title=element_text(size=12),
-        legend.text = element_text(size=9),
-        legend.title = element_text(size=10,vjust=1))
-ggsave("figures/Figure4_tsne_ACE2.png", width = 2.8, height = 3.2, units = "in")
+    axis.text=element_text(size=10,color="black"),
+    axis.text.x = element_text(size=12,angle = 0),
+    axis.text.y = element_text(size=12),
+    legend.position = "right",
+    axis.title=element_text(size=14),
+    legend.text = element_text(size=10),
+    legend.title = element_text(size=11))
+ggsave("figures/Figure4_ACE2_across_numb_mutations_without_comp.png", width = 8.2, height = 2.5, units = "in")
+###per abs
+Kds.short.tradeoff$`CB6 Escaped` <-  factor(ifelse(Kds.short.tradeoff$CB6 <= 6.00,'Yes','No'),
+                                            levels=c('Yes','No'))
+
+Kds.short.tradeoff$`CoV555 Escaped` <-  factor(ifelse(Kds.short.tradeoff$CoV555 <= 6.00,'Yes','No'),
+                                            levels=c('Yes','No'))
+
+Kds.short.tradeoff$`REGN10987 Escaped` <-  factor(ifelse(Kds.short.tradeoff$REGN10987 <= 6.00,'Yes','No'),
+                                               levels=c('Yes','No'))
 
 
-###Mean Plot
-Kds.short.tradeoff$Mean_Ab <- rowMeans(Kds.short.tradeoff[,3:6])
-ggplot(Kds.short.tradeoff,aes(x=tSNE1,y=tSNE2,color=Mean_Ab))+
-  #geom_line(aes(color= `Mutation`),size=1.25,alpha=0.8)+
-  geom_point(size = 0.5 ,alpha=0.5) +
+Kds.short.tradeoff$`Antibodies` <- factor(paste0(as.numeric(Kds.short.tradeoff$CB6 <= 6.00),
+                                                         as.numeric(Kds.short.tradeoff$CoV555 <= 6.00),
+                                                         as.numeric(Kds.short.tradeoff$REGN10987 <= 6.00)),
+                                                  levels = c('000','100','010','001','110','101','011','111'))
+
+
+mean(subset(Kds.short.tradeoff,Antibodies=='000' & `Compensatory Mutations`=="without")$ACE2)
+ggplot(na.omit(Kds.short.tradeoff),aes(x=Antibodies,y=ACE2,fill =`Compensatory Mutations`))+
+  #geom_jitter(size=1.25,alpha=0.8)+
+  #geom_jitter(aes(color=Class),alpha=0.2)+
+ # geom_violin(alpha=0.8,trim=FALSE)+
+  
+  geom_boxplot( color="black", alpha = 0.8) +
+  #geom_boxplot()+
+  #geom_line(aes(color=Classes.escapes,linetype=compensatory),size = 1 ,alpha=0.5) +
   #geom_errorbar(aes(ymin=`KD Effect`-STE, ymax=`KD Effect`+STE),color="black",width=0.0003,
   #              colour = "#969696",size=0.5,alpha=0.5)+
-  scale_color_gradient2(limits = c(6.6,10),low = brewer.pal(8,"Set1")[2],
-                       mid = "#dedede",
+  scale_fill_manual(values = c("gray90","gray10"))+
+  #scale_color_manual(values = getYellowtoRed(16))+
+  labs(y=expression(atop("ACE2",(-log~italic(K)[paste("D", ",", "app")]))),
+       x="Antibodies Escaped",
+       
+       fill="Q498R/N501Y") +
+  scale_x_discrete(labels=c("000" = "None", 
+                            "100" = "LY-CoV016",
+                            "010" = "LY-CoV555",
+                            "001" = "REGN10987",
+                            "110" = "LY-CoV016,\nLY-CoV555",
+                            "101" = "LY-CoV016,\nREGN10987",
+                            "011" = "LY-CoV555,\nREGN10987",
+                            "111" = "All Three"),
+                   expand=c(0.1, 0),drop=TRUE)+
+  #geom_text_repel(data=subset(first.structure,buriedSA>0),
+  #          aes(buriedSA-3.5,ACE2_Effect+.1,label=Term),size=4,color="black")+
+  theme_classic()+
+  #xlim(0,130)+
+  geom_hline(yintercept = 9.033694 , colour = "black", linetype = "dotted")+
+  geom_hline(yintercept = mean(subset(Kds.short.tradeoff,Antibodies=='000' & `Compensatory Mutations`=="without")$ACE2),
+             colour = "#121212", linetype = "dashed")+
+  
+  #guides(color=guide_legend(ncol=2))+
+  theme(
+    axis.text=element_text(size=10,color="black"),
+    axis.text.x = element_text(size=10,angle = 90,vjust=0.5,hjust=1),
+    axis.text.y = element_text(size=14),
+    legend.position = "right",
+    axis.title.x=element_text(size=14),
+    axis.title.y=element_text(size=12.5),
+    legend.text = element_text(size=10),
+    legend.title = element_text(size=11))
+ggsave("figures/Figure4_ACE2_across_abs_escaped.png", width = 8.2, height = 2.5, units = "in")
+```
+
+```{r}
+phylogeny_stuff <- read.delim("data/fig4_phylogeny.csv" ,header = TRUE, sep = ",", dec = ".")
+phylogeny_stuff$enrichment <- (phylogeny_stuff$philogeny_501498/phylogeny_stuff$philogeny_all)*13/15
+phylogeny_stuff.long <- reshape(phylogeny_stuff, 
+                                direction = "long",
+                                varying = list(names(phylogeny_stuff)[2:9]),
+                                v.names = "Value",
+                                idvar = "Mutation",
+                                timevar = "Antibody",
+                                times = c(names(phylogeny_stuff)[2:6],"Freq.","Freq. with\nQ498R, N501Y", "Enrichment with\nQ498R, N501Y"))
+phylogeny_stuff.long$Antibody <- factor(phylogeny_stuff.long$Antibody,
+                                        levels=c(names(phylogeny_stuff)[2:6],"Freq. with\nQ498R, N501Y","Freq.","Enrichment with\nQ498R, N501Y"))
+
+phylogeny_stuff.long$Type <- factor(c(rep("Mean Effect",15*5),rep("Frequency",15*2),rep("En",15)),
+                                    levels=c("Mean Effect", "Frequency","En"))
+
+phylogeny_stuff.long$Mutation <- factor(phylogeny_stuff.long$Mutation, levels=nn.muts)
+phylogeny_stuff.long$Antibody.used <- ifelse(phylogeny_stuff.long$Antibody=="CB6","LY-CoV016",
+                                             ifelse(phylogeny_stuff.long$Antibody=="CoV555",
+                                                    "LY-CoV555",
+                                                    as.character(phylogeny_stuff.long$Antibody)))
+  
+phylogeny_stuff.long$Antibody.used <- factor(phylogeny_stuff.long$Antibody.used,
+                                             levels = c("S309",
+                                                        "REGN10987",
+                                                        "LY-CoV555",
+                                                        "LY-CoV016",
+                                                        "ACE2","Freq. with\nQ498R, N501Y","Freq.","Enrichment with\nQ498R, N501Y")
+)
+ggplot() + 
+  geom_tile(data = subset(phylogeny_stuff.long,Type =="Mean Effect"),
+            mapping=aes(x=`Mutation`, y=`Antibody.used`, fill= `Value`)) +
+  scale_fill_gradient2(low = brewer.pal(8,"Set1")[2],
+                       mid = "white",
                        high = brewer.pal(8,"Set1")[1],
-                       midpoint = 8.3)+
-  labs(x="tSNE-1",
-       y="tSNE-2",
-       color="Mean Affinity\nto Antibodies") +
-  #geom_text_repel(data=subset(first.structure,buriedSA>0),
-  #          aes(buriedSA-3.5,ACE2_Effect+.1,label=Term),size=4,color="black")+
+                       midpoint = 0,
+                       guide = guide_colorbar(order = 1)) +
+  #labs(fill="Second \nOrder ")+
+  new_scale_fill()+
+  geom_tile(data = subset(phylogeny_stuff.long,Type =="En"),
+             mapping=aes(x=`Mutation`, y=`Antibody.used`, fill= `Value`)) +
+  scale_fill_gradient2(
+                       low ="#66a182",
+                       mid = "white",
+                       high = "#edae49",
+                       midpoint = 1,
+                       na.value = "#303030",
+                       guide = guide_colorbar(order = 2)) +
+  #labs(fill="Higher \nOrder ")+
+  xlab("Mutation") +
+  ylab("") +
   theme_classic()+
-  #xlim(0,130)+
-  #geom_hline(yintercept = 0 , colour = "black", linetype = "dashed")+
-  theme(
-        axis.text=element_text(size=10,color="black"),
-        axis.text.x = element_text(size=11,angle = 0),
-        axis.text.y = element_text(size=11),
-        legend.position = "bottom",
-        axis.title=element_text(size=12),
-        legend.text = element_text(size=9),
-        legend.title = element_text(size=10,vjust=1))
-ggsave("figures/Figure4_tsne_mean_ab.png", width = 2.8, height = 3.2, units = "in")
-```
-
-```{r plotly}
-# Point colors
-#Kds.short.tradeoff$ACE2 <- ifelse((Kds.short.tradeoff$ACE2)<7,7,Kds.short.tradeoff$ACE2)
-marker <- list(color = ~ACE2, colorscale = 'Hot', 
-              showscale = TRUE,opacity=.7,size=5
-              )
-# Create the plot
-p <- plot_ly(Kds.short.tradeoff, x = ~jitter(CB6,1), y = ~jitter(CoV555,1), z = ~jitter(REGN10987,1), marker = marker) %>%
-  add_markers() %>%
-  layout(
-    scene = list(xaxis = list(title = 'CB6'),
-        yaxis = list(title = 'CoV555'),
-        zaxis = list(title = 'REGN10987'))
-        )
-p
-```
+  facet_grid(rows=vars(Type),scales="free",space="free_y")+
+  #facet_grid(second~Antibody,scales="free",space="free_y")+
+  
+  #facet_wrap( ~ Antibody, ncol = 2)+
+  #coord_equal()+
+  theme(axis.text.x = element_text(angle = 90,hjust = 1, vjust = 0.5),
+        axis.text=element_text(size=12,color="black"),
+        legend.text=element_text(size=10,hjust = 0.5, vjust = 0.5,angle=0),
+        legend.title=element_blank(),
+        axis.title=element_text(size=14),
+        legend.position="right",
+        legend.key.size = unit(0.7, "lines"),
+        strip.text = element_text(size=8),
+        strip.switch.pad.grid = unit(0.1,"cm"),
+        legend.spacing.x = unit(0, 'cm'))
 
 
-
-```{r pca}
-library(ggplot2)
-Kds.short.tradeoff$ACE2 <- ifelse(is.na(Kds.short.tradeoff$ACE2),6,Kds.short.tradeoff$ACE2)
-pca_res <- prcomp(Kds.short.tradeoff[3:6], scale. = TRUE)
-Kds.short.tradeoff[paste0("Mutation_",nn.muts)] <- Kds_simplified[paste0("Mutation_",nn)] 
-p <- autoplot(pca_res, data = Kds.short.tradeoff, colour = 'ACE2',size=0.1,loadings = TRUE,loadings.colour = 'blue',loadings.label = TRUE, loadings.label.size = 3)
-p
-ggplotly(p)
+ggsave("figures/Figure4_phylogeny.png", width = 6.5, height = 2.7, units = "in")
 ```
