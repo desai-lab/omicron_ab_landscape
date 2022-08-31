@@ -6,5 +6,5 @@ Folder description:
 
 - TiteSeq: Pipeline to read the raw sequencing data and extract Kd values.
 - Analysis: All notebooks used to look at the data and produce the figures.
-- Final figures: R files generating the figures from the paper
+- data: all data used to produce figures in `Omicron_ab_Landscape.Rmd`.
 - Additional_data: Data from other sources used to validate the results.
